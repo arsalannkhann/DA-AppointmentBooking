@@ -1,0 +1,239 @@
+[
+    {
+        "id": 1,
+        "section": "BASIC_TRIAGE",
+        "prompt": "I have mild tooth pain since yesterday.",
+        "expected": {
+            "condition": "general_checkup",
+            "specialist": "General Dentist",
+            "duration": 15,
+            "room": "Room 1"
+        }
+    },
+    {
+        "id": 2,
+        "section": "BASIC_TRIAGE",
+        "prompt": "My gum is bleeding when brushing.",
+        "expected": {
+            "condition": "emergency",
+            "specialist": "General Dentist",
+            "duration": 15,
+            "room": "Room 1"
+        }
+    },
+    {
+        "id": 3,
+        "section": "BASIC_TRIAGE",
+        "prompt": "My filling fell out.",
+        "expected": {
+            "condition": "filling",
+            "specialist": "General Dentist",
+            "duration": 30,
+            "room": "Room 1"
+        }
+    },
+    {
+        "id": 4,
+        "section": "BASIC_TRIAGE",
+        "prompt": "I broke a tooth chewing ice.",
+        "expected": {
+            "condition": "filling",
+            "specialist": "General Dentist",
+            "duration": 30,
+            "room": "Room 1"
+        }
+    },
+    {
+        "id": 5,
+        "section": "BASIC_TRIAGE",
+        "prompt": "I just want a routine checkup.",
+        "expected": {
+            "condition": "general_checkup",
+            "specialist": "General Dentist",
+            "duration": 15,
+            "room": "Room 1"
+        }
+    },
+    {
+        "id": 6,
+        "section": "ROOT_CANAL",
+        "prompt": "My dentist said I may need a root canal.",
+        "expected": {
+            "condition": "root_canal",
+            "specialist": "Endodontist",
+            "room": "Room 2"
+        }
+    },
+    {
+        "id": 7,
+        "section": "ROOT_CANAL",
+        "prompt": "Severe pain in lower molar, throbbing.",
+        "expected": {
+            "condition": "root_canal",
+            "specialist": "Endodontist",
+            "room": "Room 2"
+        }
+    },
+    {
+        "id": 8,
+        "section": "ROOT_CANAL",
+        "prompt": "I want to complete root canal in one visit.",
+        "expected": {
+            "condition": "root_canal",
+            "allow_combo": true
+        }
+    },
+    {
+        "id": 9,
+        "section": "ROOT_CANAL",
+        "prompt": "I already had consultation elsewhere, need RCT only.",
+        "expected": {
+            "condition": "root_canal"
+        }
+    },
+    {
+        "id": 11,
+        "section": "WISDOM_TOOTH",
+        "prompt": "My wisdom tooth hurts badly.",
+        "expected": {
+            "condition": "wisdom_extraction",
+            "specialist": "Oral Surgeon"
+        }
+    },
+    {
+        "id": 12,
+        "section": "WISDOM_TOOTH",
+        "prompt": "Doctor told me wisdom tooth extraction needed.",
+        "expected": {
+            "condition": "wisdom_extraction",
+            "specialist": "Oral Surgeon",
+            "room": "Room 4"
+        }
+    },
+    {
+        "id": 13,
+        "section": "WISDOM_TOOTH",
+        "prompt": "I want sedation during extraction.",
+        "expected": {
+            "condition": "wisdom_extraction",
+            "requires_sedation": true,
+            "requires_anesthetist": true,
+            "room": "Room 4"
+        }
+    },
+    {
+        "id": 16,
+        "section": "COMPLEX",
+        "prompt": "I need root canal and cleaning.",
+        "expected": {
+            "condition": "root_canal"
+        }
+    },
+    {
+        "id": 18,
+        "section": "COMPLEX",
+        "prompt": "I need IV sedation for surgery.",
+        "expected": {
+            "requires_sedation": true,
+            "requires_anesthetist": true
+        }
+    },
+    {
+        "id": 31,
+        "section": "EDGE_CASES",
+        "prompt": "My tooth feels weird.",
+        "expected": {
+            "action": "CLARIFY"
+        }
+    },
+    {
+        "id": 32,
+        "section": "EDGE_CASES",
+        "prompt": "Extreme pain 10/10.",
+        "expected": {
+            "category": "EMERGENCY",
+            "is_emergency": true
+        }
+    },
+    {
+        "id": 33,
+        "section": "EDGE_CASES",
+        "prompt": "Something stuck in tooth.",
+        "expected": {
+            "condition": "general_checkup"
+        }
+    },
+    {
+        "id": 34,
+        "section": "EDGE_CASES",
+        "prompt": "My previous RCT failed.",
+        "expected": {
+            "condition": "root_canal",
+            "specialist": "Endodontist"
+        }
+    },
+    {
+        "id": 71,
+        "section": "RANDOM",
+        "prompt": "Upper jaw swelling.",
+        "expected": {
+            "condition": "root_canal"
+        }
+    },
+    {
+        "id": 72,
+        "section": "RANDOM",
+        "prompt": "Sharp pain when biting.",
+        "expected": {
+            "condition": "filling"
+        }
+    },
+    {
+        "id": 73,
+        "section": "RANDOM",
+        "prompt": "Bleeding after extraction.",
+        "expected": {
+            "condition": "emergency"
+        }
+    },
+    {
+        "id": 75,
+        "section": "RANDOM",
+        "prompt": "Cracked crown.",
+        "expected": {
+            "condition": "crown"
+        }
+    },
+    {
+        "id": 76,
+        "section": "RANDOM",
+        "prompt": "Tooth sensitivity to cold.",
+        "expected": {
+            "condition": "root_canal"
+        }
+    },
+    {
+        "id": 80,
+        "section": "RANDOM",
+        "prompt": "Chipped front tooth.",
+        "expected": {
+            "condition": "filling"
+        }
+    },
+    {
+        "id": 81,
+        "section": "RANDOM",
+        "prompt": "Gum abscess.",
+        "expected": {
+            "condition": "root_canal"
+        }
+    },
+    {
+        "id": 87,
+        "section": "RANDOM",
+        "prompt": "Crown came off.",
+        "expected": {
+            "condition": "crown"
+        }
+    }
+]
