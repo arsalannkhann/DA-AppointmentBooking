@@ -26,7 +26,55 @@ At its core, Bronn solves the **Resource Intersection Problem**: ensuring that a
 
 ---
 
-## 3. Data Architecture (ERD)
+## 3. High-Level System Design
+
+The architecture is built for **resilience and observability**, utilizing a modular 3-tier approach with specialized clinical sub-systems.
+
+```mermaid
+graph TD
+    %% Node Definitions
+    User(("fa:fa-user Patient"))
+    UI["fa:fa-desktop Chat Interface<br/>(Next.js 14)"]
+    API["fa:fa-gears API Gateway<br/>(FastAPI)"]
+    
+    subgraph "Orchestration Layer"
+        IA["fa:fa-brain Intent Analyzer"]
+        RE["fa:fa-vial Rule Engine"]
+        Solver["fa:fa-calendar-check Constraint Solver"]
+    end
+    
+    subgraph "Persistence"
+        DB[("fa:fa-database PostgreSQL")]
+        Redis[("fa:fa-bolt Redis")]
+    end
+    
+    AI(("fa:fa-microchip Google Gemini"))
+
+    %% Flow
+    User -->|Symptoms| UI
+    UI -->|JSON| API
+    API -->|Context| IA
+    IA <-->|Parse| AI
+    IA -->|Features| RE
+    RE -->|Clinical ID| Solver
+    Solver -->|Lock| DB
+    API <-->|Rate Limit| Redis
+
+    %% Styling
+    style User fill:#f9f,stroke:#333,stroke-width:2px
+    style UI fill:#bbf,stroke:#333,stroke-width:2px,color:#000
+    style API fill:#dfd,stroke:#333,stroke-width:2px,color:#000
+    style IA fill:#fff4dd,stroke:#d4a017,stroke-width:2px,color:#000
+    style RE fill:#fff4dd,stroke:#d4a017,stroke-width:2px,color:#000
+    style Solver fill:#fff4dd,stroke:#d4a017,stroke-width:2px,color:#000
+    style DB fill:#e1f5fe,stroke:#01579b,stroke-width:2px,color:#000
+    style Redis fill:#ffebee,stroke:#c62828,stroke-width:2px,color:#000
+    style AI fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000
+```
+
+---
+
+## 4. Data Architecture (ERD)
 
 The system utilizes a 20-table high-integrity schema designed for strict tenant isolation and atomic resource locking.
 
