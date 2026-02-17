@@ -34,7 +34,7 @@
   /* Border System */
   --border-primary: #374151;
   --border-hover: #4b5563;
-  --border-active: rgba(79, 70, 229, 0.5);
+  --border-active: rgba(6, 182, 212, 0.5);
   --border-subtle: #1f2937;
 
   /* Accent Colors - Professional Teal/Cyan */
@@ -65,6 +65,7 @@
   --clinical-medium: #3b82f6;
   --clinical-low: #10b981;
   --clinical-safe: #10b981;
+  --clinical-info: #06b6d4;
 
   /* Layout Constants */
   --sidebar-width: 280px;
@@ -96,6 +97,7 @@
   --space-lg: 24px;
   --space-xl: 32px;
   --space-2xl: 48px;
+  --space-3xl: 64px;
 }
 
 /* ── Base ─────────────────────────────────────────────────────────────────── */
@@ -254,6 +256,35 @@ button:disabled {
   border-color: var(--border-hover);
 }
 
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  padding: 10px 20px;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.btn-danger {
+  background: var(--status-error);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #dc2626;
+}
+
 /* ── Table ────────────────────────────────────────────────────────────────── */
 table {
   width: 100%;
@@ -358,6 +389,37 @@ tbody tr:hover {
   border: 1px solid var(--status-info);
 }
 
+.badge-neutral {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  border: 1px solid var(--border-primary);
+}
+
+/* ── Slot Selection ──────────────────────────────────────────────────────── */
+.slot-row {
+  display: grid;
+  grid-template-columns: 100px 80px 1fr auto;
+  gap: var(--space-md);
+  align-items: center;
+  padding: var(--space-md);
+  width: 100%;
+  text-align: left;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-input);
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+.slot-row:hover {
+  border-color: var(--border-hover);
+}
+
+.slot-row-selected {
+  background: rgba(6, 182, 212, 0.08);
+  border-color: var(--accent-primary);
+}
+
 /* ── Scrollbar ───────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar {
   width: 6px;
@@ -431,7 +493,7 @@ tbody tr:hover {
 }
 
 ::selection {
-  background: rgba(37, 99, 235, 0.3);
+  background: rgba(6, 182, 212, 0.3);
   color: var(--text-primary);
 }
 
@@ -465,4 +527,91 @@ tbody tr:hover {
 
 .toast-exit {
   animation: toastOut 0.15s ease forwards;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE — Mobile-First Breakpoints
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Safe Area Support ───────────────────────────────────────────────────── */
+html {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* ── Small screens (≤640px) ──────────────────────────────────────────────── */
+@media (max-width: 640px) {
+
+  /* Typography scaling */
+  h1 {
+    font-size: 1.5rem;
+    letter-spacing: -0.015em;
+  }
+
+  h2 {
+    font-size: 1.25rem;
+  }
+
+  h3 {
+    font-size: 1rem;
+  }
+
+  /* Card density */
+  .card {
+    padding: var(--space-md);
+    border-radius: var(--radius-md);
+  }
+
+  .card-header {
+    margin-bottom: var(--space-sm);
+    padding-bottom: var(--space-sm);
+  }
+
+  /* Slot grid — collapse to stacked */
+  .slot-row {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  /* Buttons — full-width on mobile */
+  .btn-primary,
+  .btn-secondary,
+  .btn-ghost,
+  .btn-danger {
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+
+  /* Touch targets — all interactive elements */
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+  }
+
+  /* Reduce base body font slightly */
+  body {
+    font-size: 13px;
+  }
+
+  /* Table responsiveness */
+  th,
+  td {
+    padding: 10px 12px;
+    font-size: 0.75rem;
+  }
+}
+
+/* ── Medium screens (≤768px) ─────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .slot-row {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-sm);
+  }
 }

@@ -96,7 +96,7 @@ export default function PatientOverviewPage() {
             description: "Chat with our AI assistant to find the perfect time",
             icon: MessageSquarePlus,
             href: "/patient/book",
-            color: "from-cyan-500 to-teal-500",
+            color: "from-cyan-500 to-cyan-600",
             shadowColor: "shadow-cyan-500/20",
         },
         {
@@ -104,7 +104,7 @@ export default function PatientOverviewPage() {
             description: "View upcoming visits and past history",
             icon: CalendarDays,
             href: "/patient/appointments",
-            color: "from-emerald-500 to-teal-500",
+            color: "from-emerald-500 to-emerald-600",
             shadowColor: "shadow-emerald-500/20",
         },
         {
@@ -112,7 +112,7 @@ export default function PatientOverviewPage() {
             description: "Update your personal and medical information",
             icon: User,
             href: "/patient/profile",
-            color: "from-amber-500 to-orange-500",
+            color: "from-amber-500 to-amber-600",
             shadowColor: "shadow-amber-500/20",
         },
     ];
@@ -139,9 +139,9 @@ export default function PatientOverviewPage() {
                             return (
                                 <Link key={action.title} href={action.href}>
                                     <motion.div
-                                        whileHover={{ y: -4, scale: 1.01 }}
+                                        whileHover={{ y: -2 }}
                                         whileTap={{ scale: 0.98 }}
-                                        className={`group relative overflow-hidden rounded-2xl border border-white/10 bg-brand-secondary/50 p-6 backdrop-blur-sm transition-all hover:border-white/20 hover:shadow-xl ${action.shadowColor}`}
+                                        className={`group relative overflow-hidden rounded-xl border border-white/10 bg-brand-secondary/50 p-6 backdrop-blur-sm transition-all hover:border-white/20 ${action.shadowColor}`}
                                     >
                                         <div className={`mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${action.color} shadow-lg ${action.shadowColor}`}>
                                             <Icon className="h-6 w-6 text-white" />
@@ -249,8 +249,8 @@ export default function PatientOverviewPage() {
                                     className="group flex items-center gap-4 rounded-2xl border border-white/10 bg-brand-secondary/50 p-5 backdrop-blur-sm transition-all hover:border-white/20 hover:bg-brand-secondary/70"
                                 >
                                     {/* Date Badge */}
-                                    <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-indigo-500/10 text-center">
-                                        <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400">
+                                    <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-cyan-500/10 text-center">
+                                        <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-400">
                                             {format(parseISO(appt.start_time), "MMM")}
                                         </span>
                                         <span className="text-xl font-black text-white leading-none">
@@ -277,7 +277,7 @@ export default function PatientOverviewPage() {
 
                                     {/* Time Badge */}
                                     <div className="hidden sm:block shrink-0">
-                                        <span className="rounded-full border border-indigo-500/20 bg-indigo-500/10 px-3 py-1.5 text-xs font-bold text-indigo-400">
+                                        <span className="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1.5 text-xs font-bold text-cyan-400">
                                             {formatDistanceToNow(parseISO(appt.start_time), { addSuffix: true })}
                                         </span>
                                     </div>
@@ -293,7 +293,7 @@ export default function PatientOverviewPage() {
                             </p>
                             <Link
                                 href="/patient/book"
-                                className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white transition-all hover:bg-indigo-500"
+                                className="inline-flex items-center gap-2 rounded-xl bg-cyan-600 px-5 py-2.5 text-sm font-bold text-white transition-all hover:bg-cyan-500"
                             >
                                 <MessageSquarePlus className="h-4 w-4" />
                                 Book an Appointment

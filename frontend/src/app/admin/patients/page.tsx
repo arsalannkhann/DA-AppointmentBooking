@@ -131,7 +131,7 @@ export default function AdminPatients() {
                                 className="group rounded-xl border border-brand-default bg-brand-card p-6 transition-all hover:border-brand-accent/30"
                             >
                                 <div className="flex items-start gap-4 mb-6">
-                                    <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-tr from-brand-accent to-indigo-400 text-lg font-bold text-white shrink-0">
+                                    <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-tr from-brand-accent to-cyan-400 text-lg font-bold text-white shrink-0">
                                         {patient.name
                                             .split(" ")
                                             .map((n) => n[0])

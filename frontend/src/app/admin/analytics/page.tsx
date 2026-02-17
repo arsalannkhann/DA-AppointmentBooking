@@ -117,7 +117,7 @@ export default function AdminAnalytics() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                     {[
                         { label: "Total Appointments", value: overview.total_appointments ?? 0, icon: Calendar, trend: "+12.5%", color: "text-brand-accent" },
-                        { label: "Active Patients", value: overview.active_patients ?? 0, icon: Users, trend: "+3.2%", color: "text-indigo-400" },
+                        { label: "Active Patients", value: overview.active_patients ?? 0, icon: Users, trend: "+3.2%", color: "text-cyan-400" },
                         { label: "Completion Rate", value: overview.total_appointments ? `${Math.round((overview.completed / overview.total_appointments) * 100)}%` : "0%", icon: TrendingUp, trend: "+5%", color: "text-emerald-400" },
                         { label: "Cancellation Rate", value: overview.total_appointments ? `${Math.round((overview.cancelled / overview.total_appointments) * 100)}%` : "0%", icon: Clock, trend: "-2%", color: "text-rose-400" },
                     ].map((kpi, i) => (
@@ -165,7 +165,7 @@ export default function AdminAnalytics() {
                                             return null;
                                         }}
                                     />
-                                    <Bar dataKey="appointments" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={20} />
+                                    <Bar dataKey="appointments" fill="#06b6d4" radius={[4, 4, 0, 0]} barSize={20} />
                                     <Bar dataKey="cancellations" fill="#f43f5e" radius={[4, 4, 0, 0]} barSize={20} />
                                 </BarChart>
                             </ResponsiveContainer>
@@ -280,7 +280,7 @@ export default function AdminAnalytics() {
                                                     return (
                                                         <div className="rounded-lg border border-brand-default bg-brand-secondary p-3">
                                                             <p className="text-sm font-bold text-brand-text-primary">{label}</p>
-                                                            <p className="text-xs font-bold text-indigo-400 mt-1">{payload[0].value}% Utilization</p>
+                                                            <p className="text-xs font-bold text-cyan-400 mt-1">{payload[0].value}% Utilization</p>
                                                         </div>
                                                     );
                                                 }
@@ -289,7 +289,7 @@ export default function AdminAnalytics() {
                                         />
                                         <Bar dataKey="utilization_pct" radius={[0, 4, 4, 0]} barSize={24}>
                                             {stats.doctor_utilization.map((entry: any, index: number) => (
-                                                <Cell key={`cell-${index}`} fill={entry.utilization_pct > 80 ? "#6366f1" : entry.utilization_pct > 50 ? "#818cf8" : "#374151"} />
+                                                <Cell key={`cell-${index}`} fill={entry.utilization_pct > 80 ? "#06b6d4" : entry.utilization_pct > 50 ? "#22d3ee" : "#374151"} />
                                             ))}
                                         </Bar>
                                     </BarChart>

@@ -37,11 +37,11 @@ const FieldRenderer = ({
         case "text":
             return (
                 <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-300">
-                        {field.label} {field.required && <span className="text-rose-400">*</span>}
+                    <label className="text-sm font-medium text-brand-text-secondary">
+                        {field.label} {field.required && <span className="text-red-400">*</span>}
                     </label>
                     <input
-                        className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                        className="w-full bg-brand-input border border-[var(--border-primary)] rounded-lg px-4 py-3 text-white placeholder-brand-text-muted focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all"
                         placeholder="Type your answer..."
                         value={value || ""}
                         onChange={(e) => onChange(e.target.value)}
@@ -52,12 +52,12 @@ const FieldRenderer = ({
         case "select":
             return (
                 <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-300">
-                        {field.label} {field.required && <span className="text-rose-400">*</span>}
+                    <label className="text-sm font-medium text-brand-text-secondary">
+                        {field.label} {field.required && <span className="text-red-400">*</span>}
                     </label>
                     <div className="relative">
                         <select
-                            className="w-full bg-slate-900/50 border border-slate-700 rounded-lg px-4 py-3 text-slate-100 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                            className="w-full bg-brand-input border border-[var(--border-primary)] rounded-lg px-4 py-3 text-white appearance-none focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all"
                             value={value || ""}
                             onChange={(e) => onChange(e.target.value)}
                         >
@@ -66,7 +66,7 @@ const FieldRenderer = ({
                                 <option key={opt} value={opt}>{opt}</option>
                             ))}
                         </select>
-                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-brand-text-muted">
                             ▼
                         </div>
                     </div>
@@ -77,10 +77,10 @@ const FieldRenderer = ({
             return (
                 <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                        <label className="text-sm font-medium text-slate-300">
-                            {field.label} {field.required && <span className="text-rose-400">*</span>}
+                        <label className="text-sm font-medium text-brand-text-secondary">
+                            {field.label} {field.required && <span className="text-red-400">*</span>}
                         </label>
-                        <span className="text-sm font-bold text-blue-400 bg-blue-500/10 px-2 py-1 rounded">
+                        <span className="text-sm font-bold text-cyan-400 bg-cyan-500/10 px-2 py-1 rounded">
                             {value || field.min || 1}/10
                         </span>
                     </div>
@@ -91,9 +91,9 @@ const FieldRenderer = ({
                         step={1}
                         value={value || field.min || 1}
                         onChange={(e) => onChange(parseInt(e.target.value))}
-                        className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                        className="w-full h-2 bg-brand-elevated rounded-lg appearance-none cursor-pointer accent-cyan-500"
                     />
-                    <div className="flex justify-between text-xs text-slate-500 px-1">
+                    <div className="flex justify-between text-xs text-brand-text-muted px-1">
                         <span>Mild</span>
                         <span>Moderate</span>
                         <span>Severe</span>
@@ -104,15 +104,15 @@ const FieldRenderer = ({
         case "boolean":
             return (
                 <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-300">
-                        {field.label} {field.required && <span className="text-rose-400">*</span>}
+                    <label className="text-sm font-medium text-brand-text-secondary">
+                        {field.label} {field.required && <span className="text-red-400">*</span>}
                     </label>
                     <div className="flex gap-3">
                         <button
                             onClick={() => onChange(true)}
                             className={`flex-1 py-3 px-4 rounded-lg border transition-all ${value === true
                                 ? "bg-rose-500/20 border-rose-500/50 text-rose-200"
-                                : "bg-slate-900/50 border-slate-700 text-slate-400 hover:bg-slate-800"
+                                : "bg-brand-input border-[var(--border-primary)] text-brand-text-muted hover:bg-brand-elevated"
                                 }`}
                         >
                             Yes
@@ -121,7 +121,7 @@ const FieldRenderer = ({
                             onClick={() => onChange(false)}
                             className={`flex-1 py-3 px-4 rounded-lg border transition-all ${value === false
                                 ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-200"
-                                : "bg-slate-900/50 border-slate-700 text-slate-400 hover:bg-slate-800"
+                                : "bg-brand-input border-[var(--border-primary)] text-brand-text-muted hover:bg-brand-elevated"
                                 }`}
                         >
                             No
@@ -166,14 +166,14 @@ export const ClarificationPanel = ({ issues, onComplete, loading }: Clarificatio
 
     return (
         <div className="space-y-6">
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6 backdrop-blur-sm">
-                <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-700/50">
-                    <div className="p-2 bg-blue-500/20 rounded-lg">
-                        <HelpCircle className="w-5 h-5 text-blue-400" />
+            <div className="card">
+                <div className="flex items-center gap-3 mb-6 pb-4 border-b border-[var(--border-subtle)]">
+                    <div className="p-2 bg-cyan-500/10 rounded-lg border border-cyan-500/20">
+                        <HelpCircle className="w-5 h-5 text-cyan-400" />
                     </div>
                     <div>
-                        <h3 className="text-lg font-medium text-slate-100">Clinical Clarification Required</h3>
-                        <p className="text-sm text-slate-400">Please provide the following details to proceed with routing.</p>
+                        <h3 className="text-lg font-semibold text-white">Clinical Clarification Required</h3>
+                        <p className="text-sm text-brand-text-muted">Please provide the following details to proceed with routing.</p>
                     </div>
                 </div>
 
@@ -182,16 +182,16 @@ export const ClarificationPanel = ({ issues, onComplete, loading }: Clarificatio
                         <div key={issue.issue_id} className="animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
                             {/* Issue Header */}
                             <div className="flex items-center gap-2 mb-4">
-                                <span className="bg-slate-700 text-slate-300 text-xs font-bold px-2 py-1 rounded uppercase tracking-wider">
+                                <span className="badge badge-neutral text-xs">
                                     Issue {idx + 1}
                                 </span>
-                                <h4 className="text-slate-200 font-medium capitalize">
+                                <h4 className="text-brand-text-secondary font-medium capitalize">
                                     {issue.summary}
                                 </h4>
                             </div>
 
                             {/* Dynamic Fields Grid */}
-                            <div className="grid gap-6 pl-4 border-l-2 border-slate-700/50 ml-1">
+                            <div className="grid gap-6 pl-4 border-l-2 border-[var(--border-primary)] ml-1">
                                 {issue.missing_fields.map(field => (
                                     <FieldRenderer
                                         key={field.field_key}
@@ -206,15 +206,15 @@ export const ClarificationPanel = ({ issues, onComplete, loading }: Clarificatio
                 </div>
 
                 {/* Submit Action */}
-                <div className="mt-8 pt-6 border-t border-slate-700/50 flex justify-end">
+                <div className="mt-8 pt-6 border-t border-[var(--border-subtle)] flex justify-end">
                     <button
                         onClick={handleSubmit}
                         disabled={!canSubmit || loading}
                         className={`
                             flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all
                             ${canSubmit && !loading
-                                ? "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20"
-                                : "bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700"}
+                                ? "btn-primary"
+                                : "bg-brand-elevated text-brand-text-muted cursor-not-allowed border border-[var(--border-primary)]"}
                         `}
                     >
                         {loading ? (

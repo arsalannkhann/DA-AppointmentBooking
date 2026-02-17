@@ -118,7 +118,7 @@ export default function AdminDashboard() {
         return (
             <DashboardLayout role="admin" title="Operations Overview" subtitle="Real-time clinic performance metrics">
                 <div className="flex h-[400px] items-center justify-center">
-                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent"></div>
+                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent"></div>
                 </div>
             </DashboardLayout>
         );
@@ -154,10 +154,10 @@ export default function AdminDashboard() {
                 {/* KPI Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     {kpiStats.map((stat, i) => (
-                        <motion.div key={i} variants={itemVariants} className="group rounded-xl border border-brand-default bg-brand-card p-6 transition-all hover:border-indigo-500/40">
+                        <motion.div key={i} variants={itemVariants} className="group rounded-xl border border-brand-default bg-brand-card p-6 transition-all hover:border-cyan-500/40">
                             <div className="relative">
                                 <div className="flex items-start justify-between">
-                                    <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${stat.alert ? "bg-rose-500/10 text-rose-500 border border-rose-500/20" : "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20"}`}>
+                                    <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${stat.alert ? "bg-rose-500/10 text-rose-500 border border-rose-500/20" : "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20"}`}>
                                         <stat.icon size={22} strokeWidth={2} />
                                     </div>
                                     {stat.alert ? (
@@ -193,9 +193,9 @@ export default function AdminDashboard() {
                             </div>
                             <div className="flex items-center gap-4">
                                 <div className="hidden sm:flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-brand-text-muted border-r border-brand-default pr-4">
-                                    <div className="h-2 w-2 rounded-full bg-indigo-500" /> {stats.overview.scheduled} Scheduled
+                                    <div className="h-2 w-2 rounded-full bg-cyan-500" /> {stats.overview.scheduled} Scheduled
                                 </div>
-                                <select className="rounded-lg border border-brand-default bg-brand-secondary px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-brand-text-primary outline-none transition-all hover:border-indigo-500/40 cursor-pointer">
+                                <select className="rounded-lg border border-brand-default bg-brand-secondary px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-brand-text-primary outline-none transition-all hover:border-cyan-500/40 cursor-pointer">
                                     <option>View: Week</option>
                                     <option>View: Month</option>
                                 </select>
@@ -218,7 +218,7 @@ export default function AdminDashboard() {
                                             return (
                                                 <div className="rounded-lg border border-brand-default bg-brand-secondary p-3">
                                                     <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-brand-text-muted">{label}</p>
-                                                    <p className="text-sm font-bold text-brand-text-primary">{payload[0].value}% <span className="text-[10px] font-medium text-indigo-400 ml-1">Utilization</span></p>
+                                                    <p className="text-sm font-bold text-brand-text-primary">{payload[0].value}% <span className="text-[10px] font-medium text-cyan-400 ml-1">Utilization</span></p>
                                                 </div>
                                             );
                                         }
@@ -227,7 +227,7 @@ export default function AdminDashboard() {
                                     <Area
                                         type="monotone"
                                         dataKey="value"
-                                        stroke="#6366f1"
+                                        stroke="#06b6d4"
                                         strokeWidth={3}
                                         fillOpacity={1}
                                         fill="url(#colorUtil)"
@@ -314,7 +314,7 @@ export default function AdminDashboard() {
                                                 return (
                                                     <div className="rounded-lg border border-brand-default bg-brand-secondary p-3">
                                                         <p className="text-sm font-bold text-brand-text-primary">{label}</p>
-                                                        <p className="text-xs font-bold text-indigo-400 mt-1">{payload[0].value}% <span className="text-[10px] font-medium text-brand-text-muted">Utilization</span></p>
+                                                        <p className="text-xs font-bold text-cyan-400 mt-1">{payload[0].value}% <span className="text-[10px] font-medium text-brand-text-muted">Utilization</span></p>
                                                     </div>
                                                 );
                                             }
@@ -325,7 +325,7 @@ export default function AdminDashboard() {
                                         {stats.doctor_utilization.map((entry, index) => (
                                             <Cell
                                                 key={`cell-${index}`}
-                                                fill={entry.utilization_pct > 80 ? "#6366f1" : entry.utilization_pct > 50 ? "#818cf8" : "#374151"}
+                                                fill={entry.utilization_pct > 80 ? "#06b6d4" : entry.utilization_pct > 50 ? "#22d3ee" : "#374151"}
                                             />
                                         ))}
                                     </Bar>
@@ -351,12 +351,12 @@ export default function AdminDashboard() {
                         <div className="space-y-3">
                             {stats.recent_activity.map((act) => (
                                 <div key={act.id} className="group flex items-start gap-4 rounded-xl border border-brand-default bg-brand-secondary p-4 transition-all hover:bg-brand-tertiary">
-                                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${act.status === "success" ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/10" : act.status === "warning" ? "bg-amber-500/10 text-amber-500 border border-amber-500/10" : "bg-indigo-500/10 text-indigo-400 border border-indigo-500/10"}`}>
+                                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${act.status === "success" ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/10" : act.status === "warning" ? "bg-amber-500/10 text-amber-500 border border-amber-500/10" : "bg-cyan-500/10 text-cyan-400 border border-cyan-500/10"}`}>
                                         {act.avatar}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center justify-between gap-2">
-                                            <p className="truncate text-sm font-bold text-brand-text-primary group-hover:text-indigo-400 transition-colors">{act.action}</p>
+                                            <p className="truncate text-sm font-bold text-brand-text-primary group-hover:text-cyan-400 transition-colors">{act.action}</p>
                                             <span className="shrink-0 text-[10px] font-medium text-brand-text-muted uppercase tracking-wider">{act.time}</span>
                                         </div>
                                         <p className="mt-1 text-xs font-medium text-brand-text-muted">{act.user} • <span className="text-brand-text-secondary">{act.target}</span></p>
@@ -382,11 +382,11 @@ export default function AdminDashboard() {
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
                         {stats.room_utilization.map((room) => (
-                            <div key={room.id} className="group p-5 rounded-xl bg-brand-secondary border border-brand-default transition-all hover:border-indigo-500/30">
+                            <div key={room.id} className="group p-5 rounded-xl bg-brand-secondary border border-brand-default transition-all hover:border-cyan-500/30">
                                 <p className="text-[10px] font-bold uppercase tracking-widest text-brand-text-muted mb-4">{room.name}</p>
                                 <div className="flex items-end gap-1.5 h-16 mb-4">
                                     <div className="flex-1 bg-brand-elevated rounded-md h-full"></div>
-                                    <div className="flex-1 bg-indigo-500/30 rounded-md transition-all group-hover:bg-indigo-500/50" style={{ height: `${room.utilization_pct}%` }}></div>
+                                    <div className="flex-1 bg-cyan-500/30 rounded-md transition-all group-hover:bg-cyan-500/50" style={{ height: `${room.utilization_pct}%` }}></div>
                                 </div>
                                 <div className="flex justify-between items-center bg-brand-secondary px-3 py-1.5 rounded-lg border border-brand-default">
                                     <span className="text-[9px] font-bold uppercase tracking-widest text-brand-text-muted">{room.booked_slots} SLOTS</span>

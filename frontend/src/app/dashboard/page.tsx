@@ -81,7 +81,7 @@ const itemVariants: Variants = {
     },
 };
 
-const COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#f43f5e", "#10b981"];
+const COLORS = ["#06b6d4", "#0891b2", "#ec4899", "#f43f5e", "#10b981"];
 
 export default function DashboardPage() {
     const [data, setData] = useState<DashboardData | null>(null);
@@ -100,7 +100,7 @@ export default function DashboardPage() {
             <DashboardLayout role="admin" title="Operations Intelligence">
                 <div className="flex h-[60vh] items-center justify-center">
                     <div className="flex flex-col items-center gap-4">
-                        <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+                        <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent" />
                         <p className="text-sm text-brand-text-secondary">Loading operational data...</p>
                     </div>
                 </div>
@@ -121,7 +121,7 @@ export default function DashboardPage() {
                     </p>
                     <button
                         onClick={() => window.location.reload()}
-                        className="mt-8 rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-brand-text-primary transition-all hover:bg-indigo-500"
+                        className="mt-8 rounded-lg bg-cyan-600 px-6 py-3 text-sm font-semibold text-brand-text-primary transition-all hover:bg-cyan-500"
                     >
                         Retry Connection
                     </button>
@@ -145,7 +145,7 @@ export default function DashboardPage() {
 
     // Chart data
     const statusData = [
-        { name: "Scheduled", value: overview.scheduled, color: "#6366f1" },
+        { name: "Scheduled", value: overview.scheduled, color: "#06b6d4" },
         { name: "Completed", value: overview.completed, color: "#10b981" },
         { name: "Cancelled", value: overview.cancelled, color: "#f43f5e" },
     ];
@@ -207,7 +207,7 @@ export default function DashboardPage() {
                                 key={range}
                                 onClick={() => setTimeRange(range)}
                                 className={`rounded-lg px-4 py-1.5 text-xs font-semibold transition-all ${timeRange === range
-                                    ? "bg-indigo-600 text-brand-text-primary"
+                                    ? "bg-cyan-600 text-brand-text-primary"
                                     : "text-brand-text-secondary hover:text-brand-text-primary"
                                     }`}
                             >
@@ -230,13 +230,13 @@ export default function DashboardPage() {
                         <motion.div
                             key={idx}
                             variants={itemVariants}
-                            className="group rounded-xl border border-brand-default bg-brand-card p-6 transition-all hover:border-indigo-500/40"
+                            className="group rounded-xl border border-brand-default bg-brand-card p-6 transition-all hover:border-cyan-500/40"
                         >
                             <div className="relative">
                                 <div className="flex items-start justify-between">
                                     <div
                                         className={`flex h-10 w-10 items-center justify-center rounded-lg border ${kpi.color === "indigo"
-                                            ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/20"
+                                            ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/20"
                                             : kpi.color === "emerald"
                                                 ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                                                 : kpi.color === "rose"
@@ -450,7 +450,7 @@ export default function DashboardPage() {
                                         <td className="py-4">
                                             <div className="flex items-center gap-4">
                                                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-secondary border border-brand-default">
-                                                    <DoorOpen size={18} className="text-indigo-500" />
+                                                    <DoorOpen size={18} className="text-cyan-500" />
                                                 </div>
                                                 <span className="font-bold text-brand-text-primary tracking-tight">
                                                     {room.name}
@@ -475,7 +475,7 @@ export default function DashboardPage() {
                                             <div className="flex items-center justify-end gap-4">
                                                 <div className="h-1.5 w-32 overflow-hidden rounded-full bg-brand-secondary border border-brand-default">
                                                     <div
-                                                        className="h-full rounded-full bg-indigo-600"
+                                                        className="h-full rounded-full bg-cyan-600"
                                                         style={{ width: `${room.utilization_pct}%` }}
                                                     />
                                                 </div>
@@ -495,7 +495,7 @@ export default function DashboardPage() {
                 <motion.div variants={itemVariants}>
                     <div className="mb-6 flex items-center justify-between">
                         <h3 className="text-xl font-bold text-brand-text-primary">Clinical Network</h3>
-                        <button className="text-[10px] font-bold uppercase tracking-widest text-indigo-500 hover:text-indigo-400 transition-colors">
+                        <button className="text-[10px] font-bold uppercase tracking-widest text-cyan-500 hover:text-cyan-400 transition-colors">
                             Regional Insights
                         </button>
                     </div>
@@ -503,11 +503,11 @@ export default function DashboardPage() {
                         {clinic_breakdown.map((clinic) => (
                             <div
                                 key={clinic.id}
-                                className="group rounded-xl border border-brand-default bg-brand-card p-6 transition-all hover:border-indigo-500/40"
+                                className="group rounded-xl border border-brand-default bg-brand-card p-6 transition-all hover:border-cyan-500/40"
                             >
                                 <div className="flex items-start justify-between">
                                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-secondary border border-brand-default">
-                                        <MapPin size={20} className="text-indigo-500" />
+                                        <MapPin size={20} className="text-cyan-500" />
                                     </div>
                                     <button className="rounded-lg p-2 text-brand-text-muted opacity-0 transition-all group-hover:opacity-100 hover:bg-brand-secondary hover:text-brand-text-primary">
                                         <MoreHorizontal size={20} />

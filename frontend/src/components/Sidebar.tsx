@@ -219,10 +219,11 @@ export default function Sidebar({
                                 <Link
                                     key={link.href}
                                     href={link.href}
-                                    className={`group relative flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-all ${isActive
+                                    className={`group relative flex items-center gap-3 rounded-xl px-3 py-3.5 text-sm font-medium transition-all ${isActive
                                         ? "bg-cyan-500/10 text-cyan-400"
                                         : "text-brand-text-secondary hover:bg-brand-secondary hover:text-white"
                                         } ${!isOpen && "justify-center"}`}
+                                    onClick={() => { if (isMobile && onToggle) onToggle(); }}
                                 >
                                     {/* Active Indicator */}
                                     {isActive && isOpen && (
@@ -297,7 +298,7 @@ export default function Sidebar({
                 </AnimatePresence>
 
                 {/* Footer */}
-                <div className="border-t border-white/5 p-4 bg-brand-primary">
+                <div className="border-t border-white/5 p-4 bg-brand-primary" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
                     {/* Settings & Logout */}
                     <div className="flex flex-col gap-1">
                         <Link

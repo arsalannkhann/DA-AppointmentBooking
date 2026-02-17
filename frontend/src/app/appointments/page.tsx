@@ -144,8 +144,8 @@ export default function AppointmentsPage() {
                 };
             case "IN_PROGRESS":
                 return {
-                    color: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
-                    dot: "bg-indigo-500",
+                    color: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+                    dot: "bg-cyan-500",
                     label: "In Progress",
                 };
             case "COMPLETED":
@@ -174,7 +174,7 @@ export default function AppointmentsPage() {
             <DashboardLayout role="patient" title="Clinical Schedule">
                 <div className="flex h-[60vh] items-center justify-center">
                     <div className="flex flex-col items-center gap-4">
-                        <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+                        <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent" />
                         <p className="text-sm text-brand-text-secondary">Loading your schedule...</p>
                     </div>
                 </div>
@@ -194,7 +194,7 @@ export default function AppointmentsPage() {
                     <button
                         onClick={() => setActiveTab("upcoming")}
                         className={`rounded-lg px-6 py-2 text-xs font-semibold transition-all ${activeTab === "upcoming"
-                            ? "bg-indigo-600 text-brand-text-primary"
+                            ? "bg-cyan-600 text-brand-text-primary"
                             : "text-brand-text-secondary hover:text-brand-text-primary"
                             }`}
                     >
@@ -203,7 +203,7 @@ export default function AppointmentsPage() {
                     <button
                         onClick={() => setActiveTab("past")}
                         className={`rounded-lg px-6 py-2 text-xs font-semibold transition-all ${activeTab === "past"
-                            ? "bg-indigo-600 text-brand-text-primary"
+                            ? "bg-cyan-600 text-brand-text-primary"
                             : "text-brand-text-secondary hover:text-brand-text-primary"
                             }`}
                     >
@@ -213,7 +213,7 @@ export default function AppointmentsPage() {
 
                 <button
                     onClick={() => router.push("/patient/book")}
-                    className="group flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-brand-text-primary transition-all hover:bg-indigo-500"
+                    className="group flex items-center justify-center gap-2 rounded-lg bg-cyan-600 px-6 py-3 text-sm font-semibold text-brand-text-primary transition-all hover:bg-cyan-500"
                 >
                     <Plus size={18} />
                     New Appointment
@@ -236,7 +236,7 @@ export default function AppointmentsPage() {
                     </p>
                     <button
                         onClick={() => router.push("/patient/book")}
-                        className="mt-8 flex items-center gap-2 rounded-lg bg-indigo-600 px-8 py-3 text-sm font-semibold text-brand-text-primary transition-all hover:bg-indigo-500"
+                        className="mt-8 flex items-center gap-2 rounded-lg bg-cyan-600 px-8 py-3 text-sm font-semibold text-brand-text-primary transition-all hover:bg-cyan-500"
                     >
                         <Plus size={18} />
                         Book Appointment
@@ -272,7 +272,7 @@ export default function AppointmentsPage() {
                                     key={appt.appt_id}
                                     variants={itemVariants}
                                     layout
-                                    className="group rounded-xl border border-brand-default bg-brand-card p-6 transition-all hover:border-indigo-500/40"
+                                    className="group rounded-xl border border-brand-default bg-brand-card p-6 transition-all hover:border-cyan-500/40"
                                 >
                                     <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                                         {/* Left: Date & Info */}
@@ -305,17 +305,17 @@ export default function AppointmentsPage() {
 
                                                 <div className="mt-3 flex flex-wrap items-center gap-6 text-[11px] font-medium text-brand-text-secondary">
                                                     <div className="flex items-center gap-2">
-                                                        <Clock size={14} className="text-indigo-400" />
+                                                        <Clock size={14} className="text-cyan-400" />
                                                         <span>
                                                             {dateInfo.time} <span className="text-brand-text-muted">• {duration}</span>
                                                         </span>
                                                     </div>
                                                     <div className="flex items-center gap-2">
-                                                        <User size={14} className="text-indigo-400" />
+                                                        <User size={14} className="text-cyan-400" />
                                                         <span>{appt.doctor}</span>
                                                     </div>
                                                     <div className="flex items-center gap-2">
-                                                        <MapPin size={14} className="text-indigo-400" />
+                                                        <MapPin size={14} className="text-cyan-400" />
                                                         <span>
                                                             {appt.clinic} <span className="text-brand-text-muted">|</span> {appt.room}
                                                         </span>

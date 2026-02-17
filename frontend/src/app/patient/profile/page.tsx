@@ -91,7 +91,7 @@ export default function PatientProfile() {
                             <div className="flex h-28 w-28 items-center justify-center rounded-xl border border-brand-default bg-brand-secondary text-3xl font-bold text-brand-text-primary">
                                 {getInitials(patient.name)}
                             </div>
-                            <button className="absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-brand-text-primary transition-all hover:bg-indigo-500">
+                            <button className="absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-600 text-brand-text-primary transition-all hover:bg-cyan-500">
                                 <Camera size={18} />
                             </button>
                         </div>
@@ -100,7 +100,7 @@ export default function PatientProfile() {
                             <h1 className="text-2xl font-bold text-brand-text-primary tracking-tight">{patient.name}</h1>
                             <p className="mt-1 text-base font-medium text-brand-text-muted">{patient.email}</p>
                             <div className="mt-4 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-                                <span className="rounded-lg bg-indigo-500/10 border border-indigo-500/20 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-indigo-400">
+                                <span className="rounded-lg bg-cyan-500/10 border border-cyan-500/20 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-cyan-400">
                                     {patient.plan}
                                 </span>
                                 <span className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-400">
@@ -145,7 +145,7 @@ export default function PatientProfile() {
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id as typeof activeTab)}
                             className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-3 text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === tab.id
-                                ? "bg-indigo-600 text-brand-text-primary"
+                                ? "bg-cyan-600 text-brand-text-primary"
                                 : "text-brand-text-muted hover:text-brand-text-primary"
                                 }`}
                         >
@@ -166,7 +166,7 @@ export default function PatientProfile() {
                             <div className="space-y-6">
                                 <div className="flex items-start gap-4">
                                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-brand-secondary border border-brand-default">
-                                        <Mail size={18} className="text-indigo-400" />
+                                        <Mail size={18} className="text-cyan-400" />
                                     </div>
                                     <div className="min-w-0 flex-1">
                                         <p className="text-[10px] font-bold uppercase tracking-widest text-brand-text-muted">Email Address</p>
@@ -177,7 +177,7 @@ export default function PatientProfile() {
                                 </div>
                                 <div className="flex items-start gap-4">
                                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-brand-secondary border border-brand-default">
-                                        <Phone size={18} className="text-indigo-400" />
+                                        <Phone size={18} className="text-cyan-400" />
                                     </div>
                                     <div className="min-w-0 flex-1">
                                         <p className="text-[10px] font-bold uppercase tracking-widest text-brand-text-muted">Phone Number</p>
@@ -188,7 +188,7 @@ export default function PatientProfile() {
                                 </div>
                                 <div className="flex items-start gap-4">
                                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-brand-secondary border border-brand-default">
-                                        <MapPin size={18} className="text-indigo-400" />
+                                        <MapPin size={18} className="text-cyan-400" />
                                     </div>
                                     <div className="min-w-0 flex-1">
                                         <p className="text-[10px] font-bold uppercase tracking-widest text-brand-text-muted">Home Address</p>
@@ -212,7 +212,7 @@ export default function PatientProfile() {
                                 </div>
                                 <div className="flex items-center justify-between">
                                     <span className="text-[10px] font-bold uppercase tracking-widest text-brand-text-muted">Last Visit</span>
-                                    <span className="text-sm font-bold text-indigo-400">Feb 14, 2026</span>
+                                    <span className="text-sm font-bold text-cyan-400">Feb 14, 2026</span>
                                 </div>
                                 <div className="flex items-center justify-between">
                                     <span className="text-[10px] font-bold uppercase tracking-widest text-brand-text-muted">Health Score</span>
@@ -240,7 +240,7 @@ export default function PatientProfile() {
                                                 type="text"
                                                 defaultValue={patient.name}
                                                 disabled={!isEditing}
-                                                className="w-full rounded-lg border border-brand-default bg-brand-secondary px-4 py-3 text-sm font-semibold text-brand-text-primary outline-none transition-all focus:border-indigo-500/50 disabled:opacity-50"
+                                                className="w-full rounded-lg border border-brand-default bg-brand-secondary px-4 py-3 text-sm font-semibold text-brand-text-primary outline-none transition-all focus:border-cyan-500/50 disabled:opacity-50"
                                             />
                                         </div>
                                         <div>
@@ -251,7 +251,7 @@ export default function PatientProfile() {
                                                 type="email"
                                                 defaultValue={patient.email}
                                                 disabled={!isEditing}
-                                                className="w-full rounded-lg border border-brand-default bg-brand-secondary px-4 py-3 text-sm font-semibold text-brand-text-primary outline-none transition-all focus:border-indigo-500/50 disabled:opacity-50"
+                                                className="w-full rounded-lg border border-brand-default bg-brand-secondary px-4 py-3 text-sm font-semibold text-brand-text-primary outline-none transition-all focus:border-cyan-500/50 disabled:opacity-50"
                                             />
                                         </div>
                                         <div>
@@ -262,7 +262,7 @@ export default function PatientProfile() {
                                                 type="tel"
                                                 defaultValue={patient.phone}
                                                 disabled={!isEditing}
-                                                className="w-full rounded-lg border border-brand-default bg-brand-secondary px-4 py-3 text-sm font-semibold text-brand-text-primary outline-none transition-all focus:border-indigo-500/50 disabled:opacity-50"
+                                                className="w-full rounded-lg border border-brand-default bg-brand-secondary px-4 py-3 text-sm font-semibold text-brand-text-primary outline-none transition-all focus:border-cyan-500/50 disabled:opacity-50"
                                             />
                                         </div>
                                         <div>
@@ -272,7 +272,7 @@ export default function PatientProfile() {
                                             <input
                                                 type="date"
                                                 disabled={!isEditing}
-                                                className="w-full rounded-lg border border-brand-default bg-brand-secondary px-4 py-3 text-sm font-semibold text-brand-text-primary outline-none transition-all focus:border-indigo-500/50 disabled:opacity-50"
+                                                className="w-full rounded-lg border border-brand-default bg-brand-secondary px-4 py-3 text-sm font-semibold text-brand-text-primary outline-none transition-all focus:border-cyan-500/50 disabled:opacity-50"
                                             />
                                         </div>
                                         <div className="sm:col-span-2">
@@ -283,7 +283,7 @@ export default function PatientProfile() {
                                                 defaultValue={patient.address}
                                                 disabled={!isEditing}
                                                 rows={3}
-                                                className="w-full rounded-lg border border-brand-default bg-brand-secondary px-4 py-3 text-sm font-semibold text-brand-text-primary outline-none transition-all focus:border-indigo-500/50 disabled:opacity-50 resize-none"
+                                                className="w-full rounded-lg border border-brand-default bg-brand-secondary px-4 py-3 text-sm font-semibold text-brand-text-primary outline-none transition-all focus:border-cyan-500/50 disabled:opacity-50 resize-none"
                                             />
                                         </div>
                                     </div>
@@ -298,7 +298,7 @@ export default function PatientProfile() {
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-4">
                                                 <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-brand-secondary border border-brand-default">
-                                                    <Bell size={18} className="text-indigo-400" />
+                                                    <Bell size={18} className="text-cyan-400" />
                                                 </div>
                                                 <div>
                                                     <p className="text-sm font-bold text-brand-text-primary">
@@ -309,14 +309,14 @@ export default function PatientProfile() {
                                                     </p>
                                                 </div>
                                             </div>
-                                            <button className="relative h-6 w-11 rounded-full bg-indigo-600 transition-all">
+                                            <button className="relative h-6 w-11 rounded-full bg-cyan-600 transition-all">
                                                 <span className="absolute right-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm" />
                                             </button>
                                         </div>
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-4">
                                                 <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-brand-secondary border border-brand-default">
-                                                    <Moon size={18} className="text-indigo-400" />
+                                                    <Moon size={18} className="text-cyan-400" />
                                                 </div>
                                                 <div>
                                                     <p className="text-sm font-bold text-brand-text-primary">
@@ -327,14 +327,14 @@ export default function PatientProfile() {
                                                     </p>
                                                 </div>
                                             </div>
-                                            <button className="relative h-6 w-11 rounded-full bg-indigo-600 transition-all">
+                                            <button className="relative h-6 w-11 rounded-full bg-cyan-600 transition-all">
                                                 <span className="absolute right-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm" />
                                             </button>
                                         </div>
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-4">
                                                 <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-brand-secondary border border-brand-default">
-                                                    <Globe size={18} className="text-indigo-400" />
+                                                    <Globe size={18} className="text-cyan-400" />
                                                 </div>
                                                 <div>
                                                     <p className="text-sm font-bold text-brand-text-primary">
@@ -366,7 +366,7 @@ export default function PatientProfile() {
                                         <div className="flex items-center justify-between rounded-xl border border-brand-default bg-brand-secondary p-5">
                                             <div className="flex items-center gap-4">
                                                 <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-brand-secondary border border-brand-default">
-                                                    <Lock size={18} className="text-indigo-400" />
+                                                    <Lock size={18} className="text-cyan-400" />
                                                 </div>
                                                 <div>
                                                     <p className="text-sm font-bold text-brand-text-primary">
@@ -384,7 +384,7 @@ export default function PatientProfile() {
                                         <div className="flex items-center justify-between rounded-xl border border-brand-default bg-brand-secondary p-5">
                                             <div className="flex items-center gap-4">
                                                 <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-brand-secondary border border-brand-default">
-                                                    <Shield size={18} className="text-indigo-400" />
+                                                    <Shield size={18} className="text-cyan-400" />
                                                 </div>
                                                 <div>
                                                     <p className="text-sm font-bold text-brand-text-primary">
@@ -443,7 +443,7 @@ export default function PatientProfile() {
                                                     </p>
                                                 </div>
                                             </div>
-                                            <span className="rounded-lg bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 text-[8px] font-bold uppercase tracking-widest text-indigo-400">
+                                            <span className="rounded-lg bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 text-[8px] font-bold uppercase tracking-widest text-cyan-400">
                                                 Default
                                             </span>
                                         </div>

@@ -101,7 +101,7 @@ export default function AdminAppointments() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                     {[
                         { label: "Total", value: stats?.total_appointments ?? 0, icon: CalendarDays, color: "bg-brand-accent/10 text-brand-accent border-brand-accent/20" },
-                        { label: "Scheduled", value: stats?.scheduled ?? 0, icon: Clock, color: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20" },
+                        { label: "Scheduled", value: stats?.scheduled ?? 0, icon: Clock, color: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20" },
                         { label: "Completed", value: stats?.completed ?? 0, icon: CheckCircle2, color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" },
                         { label: "Cancelled", value: stats?.cancelled ?? 0, icon: XCircle, color: "bg-rose-500/10 text-rose-400 border-rose-500/20" },
                     ].map((kpi, i) => (

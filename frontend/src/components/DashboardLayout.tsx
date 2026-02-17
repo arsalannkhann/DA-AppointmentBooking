@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Bell,
@@ -23,7 +23,13 @@ export default function DashboardLayout({
     title,
     subtitle,
 }: DashboardLayoutProps) {
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+    // Open sidebar by default on desktop only
+    useEffect(() => {
+        const isDesktop = window.innerWidth >= 1024;
+        setIsSidebarOpen(isDesktop);
+    }, []);
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [userName, setUserName] = useState("");
@@ -90,7 +96,7 @@ export default function DashboardLayout({
             >
                 {/* Topbar */}
                 <header
-                    className={`sticky top-0 z-40 flex h-16 items-center justify-between border-b px-6 transition-all duration-300 ${scrolled
+                    className={`sticky top-0 z-40 flex h-16 items-center justify-between border-b px-3 sm:px-6 transition-all duration-300 ${scrolled
                         ? "border-white/5 bg-brand-primary/95 backdrop-blur-xl shadow-sm"
                         : "border-transparent bg-brand-primary"
                         }`}
@@ -158,7 +164,7 @@ export default function DashboardLayout({
                                         animate={{ opacity: 1, y: 0, scale: 1 }}
                                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
                                         transition={{ duration: 0.2 }}
-                                        className="absolute right-0 top-full mt-2 w-80 overflow-hidden rounded-xl border border-white/10 bg-brand-secondary shadow-2xl backdrop-blur-xl"
+                                        className="absolute right-0 sm:right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-80 max-w-sm overflow-hidden rounded-xl border border-white/10 bg-brand-secondary shadow-2xl backdrop-blur-xl"
                                     >
                                         <div className="flex items-center justify-between border-b border-white/5 px-4 py-3">
                                             <span className="text-sm font-semibold text-white">
@@ -213,7 +219,7 @@ export default function DashboardLayout({
                 </header>
 
                 {/* Page Content */}
-                <main className="flex-1 p-6 lg:p-8">
+                <main className="flex-1 p-3 sm:p-4 lg:p-8">
                     <div className="mx-auto max-w-[1400px]">{children}</div>
                 </main>
             </div>

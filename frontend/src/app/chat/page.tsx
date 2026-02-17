@@ -173,7 +173,7 @@ export default function ClinicalIntakePage() {
     const [error, setError] = useState<string | null>(null);
     const [orchestration, setOrchestration] = useState<OrchestrationData | null>(null);
     const [systemMessage, setSystemMessage] = useState<string | null>(null);
-    
+
     // Clarification State
     const [clarificationQuestions, setClarificationQuestions] = useState<string[]>([]);
     const [clarificationAnswers, setClarificationAnswers] = useState<Record<string, string>>({});
@@ -183,7 +183,7 @@ export default function ClinicalIntakePage() {
     const [locationInput, setLocationInput] = useState("");
     const [parsedIssues, setParsedIssues] = useState<ClinicalIssue[]>([]);
     const [clarificationIssues, setClarificationIssues] = useState<ClarifyIssue[] | null>(null);
-    
+
     // Booking State
     const [conversationContext, setConversationContext] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
     const [slots, setSlots] = useState<SlotData[]>([]);
@@ -452,20 +452,20 @@ export default function ClinicalIntakePage() {
         <DashboardLayout role={role} title="Clinical Routing Console" subtitle="Constraint-based specialist evaluation and appointment orchestration">
             <div className="max-w-[1400px] mx-auto">
                 {/* Progress Indicator */}
-                <div className="flex items-center gap-4 mb-8 px-1">
+                <div className="flex items-center gap-2 sm:gap-4 mb-4 sm:mb-8 px-1">
                     {[
                         { n: 1, label: "Clinical Intake" },
                         { n: 2, label: "Evaluation" },
                         { n: 3, label: "Scheduling" },
                     ].map((s, i) => (
-                        <div key={s.n} className="flex items-center gap-3">
+                        <div key={s.n} className="flex items-center gap-2 sm:gap-3">
                             {i > 0 && (
-                                <div className={`w-12 h-0.5 transition-colors ${currentStep.step > i ? "bg-cyan-500" : "bg-white/10"}`} />
+                                <div className={`w-6 sm:w-12 h-0.5 transition-colors ${currentStep.step > i ? "bg-cyan-500" : "bg-white/10"}`} />
                             )}
-                            <div className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-semibold transition-all ${currentStep.step >= s.n ? "bg-cyan-600 text-white" : "bg-white/5 text-brand-text-muted border border-white/10"}`}>
-                                {currentStep.step > s.n ? <CheckCircle2 size={16} /> : s.n}
+                            <div className={`flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full text-xs font-semibold transition-all ${currentStep.step >= s.n ? "bg-cyan-600 text-white" : "bg-white/5 text-brand-text-muted border border-white/10"}`}>
+                                {currentStep.step > s.n ? <CheckCircle2 size={14} /> : s.n}
                             </div>
-                            <span className={`text-sm font-medium transition-colors ${currentStep.step >= s.n ? "text-white" : "text-brand-text-muted"}`}>
+                            <span className={`text-sm font-medium transition-colors hidden sm:inline ${currentStep.step >= s.n ? "text-white" : "text-brand-text-muted"}`}>
                                 {s.label}
                             </span>
                         </div>
@@ -477,7 +477,7 @@ export default function ClinicalIntakePage() {
                     {/* LEFT COLUMN - Primary Workflow */}
                     <div
                         ref={scrollRef}
-                        className="flex flex-col gap-5 max-h-[calc(100vh-220px)] overflow-y-auto pr-2 custom-scrollbar"
+                        className="flex flex-col gap-5 lg:max-h-[calc(100vh-220px)] lg:overflow-y-auto lg:pr-2 custom-scrollbar"
                     >
                         {/* Error Banner */}
                         {error && (
@@ -527,7 +527,7 @@ export default function ClinicalIntakePage() {
                                 </div>
 
                                 {phase === "INPUT" && (
-                                    <div className="flex items-center gap-4">
+                                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
                                         <button
                                             onClick={handleAnalyze}
                                             disabled={!symptomText.trim() || loading}
@@ -535,7 +535,7 @@ export default function ClinicalIntakePage() {
                                         >
                                             {loading ? "Processing..." : "Begin Clinical Review"}
                                         </button>
-                                        <span className="text-xs text-brand-text-disabled">
+                                        <span className="text-xs text-brand-text-disabled text-center sm:text-left">
                                             Does not constitute medical advice
                                         </span>
                                     </div>
@@ -580,24 +580,19 @@ export default function ClinicalIntakePage() {
                                                             border: `1px solid ${urgencyColor(issue.urgency)}40`,
                                                             textTransform: "uppercase",
                                                             letterSpacing: "0.04em",
-                                                            color: urgencyColor(issue.urgency),
                                                         }}>
                                                             {urgencyLabel(issue.urgency)}
                                                         </span>
                                                     </div>
-                                                    <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                                                        Specialist: {issue.specialist_type}
-                                                        {issue.requires_sedation && " · Sedation available"}
-                                                    </span>
                                                     {/* Reasoning Traceability Layer */}
                                                     {issue.reasoning_triggers?.length > 0 && (
-                                                        <div style={{ marginTop: "10px", padding: "8px", background: "var(--bg-card)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-primary)" }}>
-                                                            <div style={{ fontSize: "0.6875rem", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", marginBottom: "4px" }}>
+                                                        <div className="mt-3 p-2 bg-brand-card rounded border border-[var(--border-primary)]">
+                                                            <div className="text-[0.6875rem] font-semibold text-brand-text-muted uppercase mb-1">
                                                                 Reason Traceability
                                                             </div>
-                                                            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                                                            <div className="flex flex-wrap gap-1.5">
                                                                 {issue.reasoning_triggers.map((t, ti) => (
-                                                                    <span key={ti} style={{ fontSize: "0.75rem", color: "var(--clinical-info)", display: "flex", alignItems: "center", gap: "4px" }}>
+                                                                    <span key={ti} className="text-xs text-cyan-400 flex items-center gap-1">
                                                                         <CheckCircle2 size={10} /> {t}
                                                                     </span>
                                                                 ))}
@@ -607,7 +602,7 @@ export default function ClinicalIntakePage() {
                                                 </div>
                                             ))}
                                         </div>
-                                    </Section>
+                                    </div>
                                 </motion.div>
                             )}
                         </AnimatePresence>
@@ -659,7 +654,7 @@ export default function ClinicalIntakePage() {
                                                 <textarea
                                                     value={symptomText}
                                                     onChange={(e) => setSymptomText(e.target.value)}
-                                                    className="w-full bg-slate-900/50 border border-slate-700/50 rounded-lg p-4 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all resize-none h-32"
+                                                    className="w-full bg-brand-input border border-[var(--border-primary)] rounded-lg p-4 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all resize-none h-32"
                                                     placeholder="Describe here..."
                                                     disabled={loading}
                                                     style={{ width: "100%", minHeight: "100px" }}
@@ -667,7 +662,7 @@ export default function ClinicalIntakePage() {
                                                 <button
                                                     onClick={handleAnalyze}
                                                     disabled={loading || !symptomText.trim()}
-                                                    className="absolute bottom-4 right-4 p-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    className="absolute bottom-4 right-4 p-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                     style={{ marginTop: "10px" }}
                                                 >
                                                     Submit
@@ -688,7 +683,7 @@ export default function ClinicalIntakePage() {
                                             <h3 className="card-title">Clinical Risk Assessment</h3>
                                             <p className="card-subtitle">Automated triage evaluation</p>
                                         </div>
-                                        
+
                                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                                             <div className="p-4 bg-brand-input rounded-lg border border-white/5">
                                                 <h6 className="text-xs font-semibold text-brand-text-muted uppercase tracking-wider mb-2">
@@ -698,7 +693,7 @@ export default function ClinicalIntakePage() {
                                                     {urgencyLabel(orchestration.overall_urgency)}
                                                 </div>
                                             </div>
-                                            
+
                                             <div className="p-4 bg-brand-input rounded-lg border border-white/5">
                                                 <h6 className="text-xs font-semibold text-brand-text-muted uppercase tracking-wider mb-2">
                                                     Emergency Status
@@ -707,7 +702,7 @@ export default function ClinicalIntakePage() {
                                                     {isEmergency ? "Detected" : "Not Detected"}
                                                 </div>
                                             </div>
-                                            
+
                                             <div className="p-4 bg-brand-input rounded-lg border border-white/5">
                                                 <h6 className="text-xs font-semibold text-brand-text-muted uppercase tracking-wider mb-2">
                                                     Airway Risk
@@ -716,7 +711,7 @@ export default function ClinicalIntakePage() {
                                                     {breathingDifficulty ? "Reported" : "Not Reported"}
                                                 </div>
                                             </div>
-                                            
+
                                             <div className="p-4 bg-brand-input rounded-lg border border-white/5">
                                                 <h6 className="text-xs font-semibold text-brand-text-muted uppercase tracking-wider mb-2">
                                                     Clinical Status
@@ -726,7 +721,7 @@ export default function ClinicalIntakePage() {
                                                 </div>
                                             </div>
                                         </div>
-                                        
+
                                         {bookingBlocked && (
                                             <div className="border-l-4 border-amber-500 bg-amber-500/10 rounded-lg p-4 mb-3">
                                                 <p className="text-sm font-medium text-amber-200">
@@ -737,7 +732,7 @@ export default function ClinicalIntakePage() {
                                                 </p>
                                             </div>
                                         )}
-                                        
+
                                         <p className="text-xs text-brand-text-disabled leading-relaxed">
                                             Clinical review required — all assessments are subject to provider verification
                                         </p>
@@ -759,7 +754,7 @@ export default function ClinicalIntakePage() {
                                         {/* Liability Disclaimer */}
                                         <div className="p-3 mb-4 bg-cyan-500/10 border border-cyan-500/20 rounded-lg">
                                             <p className="text-xs text-cyan-200 leading-relaxed">
-                                                <strong>Routing Recommendation:</strong> Based on reported symptoms and structured intake responses. 
+                                                <strong>Routing Recommendation:</strong> Based on reported symptoms and structured intake responses.
                                                 Final clinical decisions are made by the treating provider.
                                             </p>
                                         </div>
@@ -804,7 +799,7 @@ export default function ClinicalIntakePage() {
 
                                                     {/* Fallback Tier Notice */}
                                                     {issue.fallback_tier > 1 && issue.fallback_note && (
-                                                        <p className="text-xs text-indigo-400 italic mt-2">
+                                                        <p className="text-xs text-cyan-400 italic mt-2">
                                                             {issue.fallback_note}
                                                         </p>
                                                     )}
@@ -833,20 +828,19 @@ export default function ClinicalIntakePage() {
                                             <h3 className="card-title">Available Appointments ({slots.length})</h3>
                                             <p className="card-subtitle">Select your preferred time slot</p>
                                         </div>
-                                        
+
                                         <div className="flex flex-col gap-2">
                                             {slots.slice(0, 8).map((slot, i) => (
                                                 <button
                                                     key={i}
                                                     onClick={() => { setSelectedSlot(slot); setPhase("CONFIRM"); }}
-                                                    className={`grid grid-cols-[100px_80px_1fr_auto] gap-4 items-center p-4 w-full text-left rounded-lg border transition-all ${
-                                                        selectedSlot === slot
-                                                            ? "bg-indigo-500/10 border-indigo-500"
-                                                            : "bg-brand-input border-white/5 hover:border-white/20"
-                                                    }`}
+                                                    className={`grid grid-cols-[100px_80px_1fr_auto] gap-4 items-center p-4 w-full text-left rounded-lg border transition-all ${selectedSlot === slot
+                                                        ? "bg-cyan-500/10 border-cyan-500"
+                                                        : "bg-brand-input border-white/5 hover:border-white/20"
+                                                        }`}
                                                 >
                                                     <span className="text-sm font-medium text-white">{slot.date}</span>
-                                                    <span className="text-sm font-semibold text-indigo-400">{slot.time}</span>
+                                                    <span className="text-sm font-semibold text-cyan-400">{slot.time}</span>
                                                     <div className="min-w-0">
                                                         <p className="text-sm text-brand-text-secondary truncate">
                                                             {slot.doctor_name}
@@ -917,7 +911,7 @@ export default function ClinicalIntakePage() {
                                                 value={bookingNotes}
                                                 onChange={(e) => setBookingNotes(e.target.value)}
                                                 placeholder="Any additional information..."
-                                                className="w-full min-h-[80px] resize-vertical p-3 text-sm leading-relaxed bg-brand-input border border-white/10 rounded-lg text-white placeholder-brand-text-muted focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                                                className="w-full min-h-[80px] resize-vertical p-3 text-sm leading-relaxed bg-brand-input border border-white/10 rounded-lg text-white placeholder-brand-text-muted focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all"
                                             />
                                         </div>
 
@@ -987,7 +981,7 @@ export default function ClinicalIntakePage() {
                     </div>
 
                     {/* RIGHT PANEL - Case Summary */}
-                    <div className="flex flex-col gap-4 sticky top-6">
+                    <div className="flex flex-col gap-4 lg:sticky lg:top-6">
                         {/* Case Summary Card */}
                         <div className="card">
                             <h6 className="text-xs font-semibold text-brand-text-muted uppercase tracking-wider mb-4">
@@ -1005,32 +999,32 @@ export default function ClinicalIntakePage() {
                                                             "Complete"}
                                     </span>
                                 </div>
-                                
+
                                 <div className="flex justify-between items-center">
                                     <span className="text-xs text-brand-text-muted">Urgency</span>
-                                    <span className="text-xs font-medium" style={{ 
-                                        color: orchestration ? urgencyColor(orchestration.overall_urgency) : "var(--text-white)" 
+                                    <span className="text-xs font-medium" style={{
+                                        color: orchestration ? urgencyColor(orchestration.overall_urgency) : "var(--text-white)"
                                     }}>
                                         {orchestration ? urgencyLabel(orchestration.overall_urgency) : "—"}
                                     </span>
                                 </div>
-                                
+
                                 <div className="flex justify-between items-center">
                                     <span className="text-xs text-brand-text-muted">Issues Identified</span>
                                     <span className="text-xs font-medium text-white">
                                         {orchestration ? `${Math.max(orchestration.routed_issues.length, isEmergency ? 1 : 0)}` : "—"}
                                     </span>
                                 </div>
-                                
+
                                 <div className="flex justify-between items-center">
                                     <span className="text-xs text-brand-text-muted">Risk Flags</span>
-                                    <span className="text-xs font-medium" style={{ 
-                                        color: isEmergency ? "var(--clinical-urgent)" : "var(--text-white)" 
+                                    <span className="text-xs font-medium" style={{
+                                        color: isEmergency ? "var(--clinical-urgent)" : "var(--text-white)"
                                     }}>
                                         {isEmergency ? (breathingDifficulty ? "Emergency • Airway" : "Emergency") : "None"}
                                     </span>
                                 </div>
-                                
+
                                 <div className="flex justify-between items-center">
                                     <span className="text-xs text-brand-text-muted">Last Updated</span>
                                     <span className="text-xs font-medium text-white">{lastUpdated || "—"}</span>
@@ -1062,7 +1056,7 @@ export default function ClinicalIntakePage() {
                                 </h6>
                             </div>
                             <p className="text-xs text-brand-text-disabled leading-relaxed">
-                                This system assists with appointment routing only. It does not provide diagnosis or treatment. 
+                                This system assists with appointment routing only. It does not provide diagnosis or treatment.
                                 All cases are reviewed by licensed dental professionals.
                             </p>
                         </div>

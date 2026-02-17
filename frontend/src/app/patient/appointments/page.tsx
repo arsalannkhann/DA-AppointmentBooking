@@ -109,8 +109,8 @@ export default function PatientAppointments() {
         switch (status) {
             case "SCHEDULED":
                 return {
-                    color: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
-                    dot: "bg-indigo-400",
+                    color: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+                    dot: "bg-cyan-400",
                     label: isToday(parseISO(date)) ? "Today" : isTomorrow(parseISO(date)) ? "Tomorrow" : "Upcoming",
                     icon: CalendarClock,
                 };
@@ -174,7 +174,7 @@ export default function PatientAppointments() {
             <DashboardLayout role="patient" title="My Appointments">
                 <div className="flex h-[60vh] items-center justify-center">
                     <div className="flex flex-col items-center gap-4">
-                        <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+                        <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent" />
                         <p className="text-sm text-brand-text-muted">Loading appointments...</p>
                     </div>
                 </div>
@@ -195,7 +195,7 @@ export default function PatientAppointments() {
                         <button
                             onClick={() => setActiveTab("upcoming")}
                             className={`rounded-lg px-5 py-2 text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === "upcoming"
-                                ? "bg-indigo-600 text-brand-text-primary"
+                                ? "bg-cyan-600 text-brand-text-primary"
                                 : "text-brand-text-muted hover:text-brand-text-primary"
                                 }`}
                         >
@@ -204,7 +204,7 @@ export default function PatientAppointments() {
                         <button
                             onClick={() => setActiveTab("past")}
                             className={`rounded-lg px-5 py-2 text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === "past"
-                                ? "bg-indigo-600 text-brand-text-primary"
+                                ? "bg-cyan-600 text-brand-text-primary"
                                 : "text-brand-text-muted hover:text-brand-text-primary"
                                 }`}
                         >
@@ -214,7 +214,7 @@ export default function PatientAppointments() {
 
                     <button
                         onClick={() => router.push("/patient/book")}
-                        className="group flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3.5 text-[10px] font-bold uppercase tracking-widest text-brand-text-primary transition-all hover:bg-indigo-500 active:scale-[0.98]"
+                        className="group flex items-center justify-center gap-2 rounded-xl bg-cyan-600 px-6 py-3.5 text-[10px] font-bold uppercase tracking-widest text-brand-text-primary transition-all hover:bg-cyan-500 active:scale-[0.98]"
                     >
                         <Plus size={16} />
                         New Booking
@@ -229,7 +229,7 @@ export default function PatientAppointments() {
                         className="flex flex-col items-center justify-center rounded-xl border border-brand-default bg-brand-card py-20 text-center"
                     >
                         <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-xl bg-brand-secondary border border-brand-default">
-                            <CalendarDays size={36} className="text-indigo-400" />
+                            <CalendarDays size={36} className="text-cyan-400" />
                         </div>
                         <h3 className="text-xl font-bold text-brand-text-primary tracking-tight">
                             No Records Found
@@ -239,7 +239,7 @@ export default function PatientAppointments() {
                         </p>
                         <button
                             onClick={() => router.push("/patient/book")}
-                            className="mt-8 flex items-center gap-2 rounded-xl bg-indigo-600 px-8 py-3.5 text-[10px] font-bold uppercase tracking-widest text-brand-text-primary transition-all hover:bg-indigo-500"
+                            className="mt-8 flex items-center gap-2 rounded-xl bg-cyan-600 px-8 py-3.5 text-[10px] font-bold uppercase tracking-widest text-brand-text-primary transition-all hover:bg-cyan-500"
                         >
                             <Plus size={16} />
                             Start New Booking
@@ -258,7 +258,7 @@ export default function PatientAppointments() {
                         {activeTab === "upcoming" && (
                             <button
                                 onClick={() => router.push("/patient/book")}
-                                className="mt-4 text-[10px] font-bold uppercase tracking-widest text-indigo-400 hover:text-indigo-300 transition-colors"
+                                className="mt-4 text-[10px] font-bold uppercase tracking-widest text-cyan-400 hover:text-cyan-300 transition-colors"
                             >
                                 Book New Session →
                             </button>
@@ -300,7 +300,7 @@ export default function PatientAppointments() {
                                                 {/* Details */}
                                                 <div className="flex flex-col justify-center">
                                                     <div className="flex flex-wrap items-center gap-3">
-                                                        <h3 className="text-lg font-bold text-brand-text-primary tracking-tight group-hover:text-indigo-400 transition-colors">
+                                                        <h3 className="text-lg font-bold text-brand-text-primary tracking-tight group-hover:text-cyan-400 transition-colors">
                                                             {appt.procedure}
                                                         </h3>
                                                         <span
@@ -315,18 +315,18 @@ export default function PatientAppointments() {
 
                                                     <div className="mt-3 flex flex-wrap items-center gap-6 text-[10px] font-bold uppercase tracking-widest text-brand-text-muted">
                                                         <div className="flex items-center gap-2">
-                                                            <Clock size={16} className="text-indigo-400" />
+                                                            <Clock size={16} className="text-cyan-400" />
                                                             <span className="text-brand-text-secondary">
                                                                 {format(parseISO(appt.start_time), "h:mm a")} - {" "}
                                                                 {format(parseISO(appt.end_time), "h:mm a")}
                                                             </span>
                                                         </div>
                                                         <div className="flex items-center gap-2">
-                                                            <User size={16} className="text-indigo-400" />
+                                                            <User size={16} className="text-cyan-400" />
                                                             <span className="text-brand-text-secondary">{appt.doctor}</span>
                                                         </div>
                                                         <div className="flex items-center gap-2">
-                                                            <MapPin size={16} className="text-indigo-400" />
+                                                            <MapPin size={16} className="text-cyan-400" />
                                                             <span className="text-brand-text-secondary">
                                                                 {appt.clinic} • {appt.room}
                                                             </span>
