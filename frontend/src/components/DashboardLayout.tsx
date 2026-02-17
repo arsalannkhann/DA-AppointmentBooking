@@ -106,7 +106,7 @@ export default function DashboardLayout({
 
                         <div className="flex flex-col">
                             {title && (
-                                <h1 className="text-xl font-bold tracking-tight text-white leading-tight">
+                                <h1 className="text-lg font-semibold tracking-tight text-white leading-tight">
                                     {title}
                                 </h1>
                             )}
@@ -120,16 +120,16 @@ export default function DashboardLayout({
                     <div className="flex items-center gap-3">
                         {/* Global Search */}
                         <div className="relative hidden md:block">
-                            <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-brand-secondary/50 px-3 py-2 transition-all focus-within:border-brand-accent/50 focus-within:ring-4 focus-within:ring-brand-accent/5">
-                                <Search size={18} className="text-brand-text-muted" />
+                            <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-brand-secondary/50 px-3 py-2 transition-all focus-within:border-indigo-500/50 focus-within:ring-2 focus-within:ring-indigo-500/10">
+                                <Search size={16} className="text-brand-text-muted" />
                                 <input
                                     type="text"
-                                    placeholder="Search anything..."
+                                    placeholder="Search..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-48 bg-transparent text-sm text-white placeholder-brand-text-muted outline-none transition-all focus:w-64"
+                                    className="w-40 bg-transparent text-sm text-white placeholder-brand-text-muted outline-none transition-all focus:w-56"
                                 />
-                                <kbd className="hidden rounded border border-white/5 bg-brand-primary px-1.5 py-0.5 text-[10px] font-bold text-brand-text-muted sm:block">
+                                <kbd className="hidden rounded border border-white/5 bg-brand-primary px-1.5 py-0.5 text-[10px] font-medium text-brand-text-muted sm:block">
                                     ⌘K
                                 </kbd>
                             </div>
@@ -139,11 +139,11 @@ export default function DashboardLayout({
                         <div className="relative">
                             <button
                                 onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-                                className="relative rounded-xl p-2 text-brand-text-secondary transition-colors hover:bg-brand-secondary hover:text-white"
+                                className="relative rounded-lg p-2 text-brand-text-secondary transition-colors hover:bg-brand-secondary hover:text-white"
                             >
-                                <Bell size={20} />
+                                <Bell size={18} />
                                 {unreadCount > 0 && (
-                                    <span className="absolute right-2 top-2 flex h-2 w-2">
+                                    <span className="absolute right-1.5 top-1.5 flex h-2 w-2">
                                         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75"></span>
                                         <span className="relative inline-flex h-2 w-2 rounded-full bg-rose-500"></span>
                                     </span>
@@ -158,10 +158,10 @@ export default function DashboardLayout({
                                         animate={{ opacity: 1, y: 0, scale: 1 }}
                                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
                                         transition={{ duration: 0.2 }}
-                                        className="absolute right-0 top-full mt-2 w-80 overflow-hidden rounded-2xl border border-white/10 bg-brand-secondary shadow-2xl backdrop-blur-xl"
+                                        className="absolute right-0 top-full mt-2 w-80 overflow-hidden rounded-xl border border-white/10 bg-brand-secondary shadow-2xl backdrop-blur-xl"
                                     >
                                         <div className="flex items-center justify-between border-b border-white/5 px-4 py-3">
-                                            <span className="text-sm font-bold text-white">
+                                            <span className="text-sm font-semibold text-white">
                                                 Notifications
                                             </span>
                                             <span className="text-xs font-medium text-brand-text-muted">
@@ -176,15 +176,15 @@ export default function DashboardLayout({
                                                         }`}
                                                 >
                                                     <div
-                                                        className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${notification.type === "urgent"
+                                                        className={`mt-1 h-2 w-2 shrink-0 rounded-full ${notification.type === "urgent"
                                                             ? "bg-rose-500"
                                                             : notification.type === "success"
                                                                 ? "bg-emerald-500"
-                                                                : "bg-brand-accent"
+                                                                : "bg-indigo-500"
                                                             }`}
                                                     />
                                                     <div className="flex-1">
-                                                        <p className="text-sm font-semibold text-white">
+                                                        <p className="text-sm font-medium text-white">
                                                             {notification.title}
                                                         </p>
                                                         <p className="mt-0.5 text-xs text-brand-text-secondary leading-normal">
@@ -198,7 +198,7 @@ export default function DashboardLayout({
                                             ))}
                                         </div>
                                         <div className="border-t border-white/5 p-2">
-                                            <button className="w-full rounded-xl py-2.5 text-xs font-bold text-brand-text-muted transition-colors hover:bg-white/10 hover:text-white">
+                                            <button className="w-full rounded-lg py-2.5 text-xs font-medium text-brand-text-muted transition-colors hover:bg-white/10 hover:text-white">
                                                 View all notifications
                                             </button>
                                         </div>

@@ -166,27 +166,30 @@ export default function ClinicalIntakePage() {
     const { user } = useAuth();
     const role = (user?.role as "patient" | "admin") || "patient";
 
+    // Core State
     const [phase, setPhase] = useState<IntakePhase>("INPUT");
     const [symptomText, setSymptomText] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [orchestration, setOrchestration] = useState<OrchestrationData | null>(null);
     const [systemMessage, setSystemMessage] = useState<string | null>(null);
+    
+    // Clarification State
     const [clarificationQuestions, setClarificationQuestions] = useState<string[]>([]);
     const [clarificationAnswers, setClarificationAnswers] = useState<Record<string, string>>({});
     const [painSeverity, setPainSeverity] = useState(5);
     const [duration, setDuration] = useState("");
     const [breathingDifficulty, setBreathingDifficulty] = useState<boolean | null>(null);
     const [locationInput, setLocationInput] = useState("");
+    const [parsedIssues, setParsedIssues] = useState<ClinicalIssue[]>([]);
+    const [clarificationIssues, setClarificationIssues] = useState<ClarifyIssue[] | null>(null);
+    
+    // Booking State
     const [conversationContext, setConversationContext] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
     const [slots, setSlots] = useState<SlotData[]>([]);
     const [selectedSlot, setSelectedSlot] = useState<SlotData | null>(null);
     const [bookingNotes, setBookingNotes] = useState("");
     const [lastUpdated, setLastUpdated] = useState<string | null>(null);
-
-    // Extracted issues for smart dynamic form
-    const [parsedIssues, setParsedIssues] = useState<ClinicalIssue[]>([]);
-    const [clarificationIssues, setClarificationIssues] = useState<ClarifyIssue[] | null>(null);
 
     const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -446,125 +449,69 @@ export default function ClinicalIntakePage() {
     // ══════════════════════════════════════════════════════════════════════════
 
     return (
-        <DashboardLayout role={role} title="Clinical Intake" subtitle="Constraint-Aware Clinical Routing System">
-            <div style={{ maxWidth: "1120px", margin: "0 auto", padding: "24px 0" }}>
-                {/* ── Step Progress ─────────────────────────────────── */}
-                <div style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "16px",
-                    marginBottom: "24px",
-                    padding: "0 4px",
-                }}>
+        <DashboardLayout role={role} title="Clinical Routing Console" subtitle="Constraint-based specialist evaluation and appointment orchestration">
+            <div className="max-w-[1400px] mx-auto">
+                {/* Progress Indicator */}
+                <div className="flex items-center gap-4 mb-8 px-1">
                     {[
-                        { n: 1, label: "Describe Concern" },
-                        { n: 2, label: "Clinical Clarification" },
-                        { n: 3, label: "Specialist Routing" },
+                        { n: 1, label: "Clinical Intake" },
+                        { n: 2, label: "Evaluation" },
+                        { n: 3, label: "Scheduling" },
                     ].map((s, i) => (
-                        <div key={s.n} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <div key={s.n} className="flex items-center gap-3">
                             {i > 0 && (
-                                <div style={{
-                                    width: "32px",
-                                    height: "1px",
-                                    background: currentStep.step > i ? "var(--accent-primary)" : "var(--border-primary)",
-                                }} />
+                                <div className={`w-12 h-0.5 transition-colors ${currentStep.step > i ? "bg-indigo-500" : "bg-white/10"}`} />
                             )}
-                            <div style={{
-                                width: "24px",
-                                height: "24px",
-                                borderRadius: "50%",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                fontSize: "0.6875rem",
-                                fontWeight: 600,
-                                background: currentStep.step >= s.n ? "var(--accent-primary)" : "var(--bg-elevated)",
-                                color: currentStep.step >= s.n ? "#fff" : "var(--text-muted)",
-                                transition: "all var(--transition-base)",
-                                flexShrink: 0,
-                            }}>
-                                {currentStep.step > s.n ? (
-                                    <CheckCircle2 size={13} />
-                                ) : s.n}
+                            <div className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-semibold transition-all ${currentStep.step >= s.n ? "bg-indigo-600 text-white" : "bg-white/5 text-brand-text-muted border border-white/10"}`}>
+                                {currentStep.step > s.n ? <CheckCircle2 size={16} /> : s.n}
                             </div>
-                            <span style={{
-                                fontSize: "0.8125rem",
-                                color: currentStep.step >= s.n ? "var(--text-primary)" : "var(--text-muted)",
-                                fontWeight: currentStep.step === s.n ? 500 : 400,
-                                whiteSpace: "nowrap",
-                            }}>
+                            <span className={`text-sm font-medium transition-colors ${currentStep.step >= s.n ? "text-white" : "text-brand-text-muted"}`}>
                                 {s.label}
                             </span>
                         </div>
                     ))}
                 </div>
 
-                {/* ── Main Grid ─────────────────────────────────────── */}
-                <div style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 300px",
-                    gap: "20px",
-                    alignItems: "start",
-                }}>
-                    {/* LEFT COLUMN */}
+                {/* Main Grid Layout */}
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start">
+                    {/* LEFT COLUMN - Primary Workflow */}
                     <div
                         ref={scrollRef}
-                        style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "16px",
-                            maxHeight: "calc(100vh - 200px)",
-                            overflowY: "auto",
-                            paddingRight: "4px",
-                        }}
-                        className="custom-scrollbar"
+                        className="flex flex-col gap-5 max-h-[calc(100vh-220px)] overflow-y-auto pr-2 custom-scrollbar"
                     >
                         {/* Error Banner */}
                         {error && (
-                            <div style={{
-                                borderLeft: "3px solid var(--clinical-urgent)",
-                                padding: "14px 16px",
-                                borderRadius: "var(--radius-md)",
-                                background: "var(--bg-card)",
-                                border: "1px solid var(--border-primary)",
-                                borderLeftWidth: "3px",
-                                borderLeftColor: "var(--clinical-urgent)",
-                            }}>
-                                <p style={{ color: "var(--text-secondary)", fontSize: "0.8125rem", margin: 0, lineHeight: 1.6 }}>
-                                    {error}
-                                </p>
+                            <div className="border-l-4 border-red-500 bg-red-500/10 rounded-lg p-4">
+                                <p className="text-sm text-red-200 leading-relaxed">{error}</p>
                             </div>
                         )}
 
-                        {/* ── SECTION 1: Symptom Input ─────────────────── */}
-                        <Section title="Describe Your Concern">
-                            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                                {/* Guidance */}
+                        {/* SECTION 1: Symptom Input */}
+                        <div className="card">
+                            <div className="card-header">
+                                <h3 className="card-title">Clinical Intake</h3>
+                                <p className="card-subtitle">Describe your primary concern</p>
+                            </div>
+                            <div className="flex flex-col gap-4">
                                 {phase === "INPUT" && (
-                                    <div style={{
-                                        fontSize: "0.8125rem",
-                                        color: "var(--text-muted)",
-                                        lineHeight: 1.7,
-                                        paddingBottom: "8px",
-                                        borderBottom: "1px solid var(--border-primary)",
-                                    }}>
-                                        Please include the following in your description:
-                                        <div style={{ marginTop: "6px", paddingLeft: "4px" }}>
-                                            <div>· Location (upper/lower, left/right)</div>
-                                            <div>· Duration (how long have you experienced this?)</div>
-                                            <div>· Severity (1–10 scale)</div>
-                                            <div>· Associated symptoms (swelling, bleeding, fever)</div>
-                                        </div>
+                                    <div className="text-sm text-brand-text-muted leading-relaxed pb-4 border-b border-white/5">
+                                        <p className="font-medium mb-2">Please provide the following information:</p>
+                                        <ul className="space-y-1 ml-4">
+                                            <li>• Location (upper/lower, left/right)</li>
+                                            <li>• Duration (how long symptoms have persisted)</li>
+                                            <li>• Severity (pain level 1-10)</li>
+                                            <li>• Associated symptoms (swelling, bleeding, fever)</li>
+                                        </ul>
                                     </div>
                                 )}
 
-                                <div style={{ position: "relative" }}>
+                                <div className="relative">
                                     <textarea
                                         value={symptomText}
                                         onChange={(e) => {
                                             if (e.target.value.length <= MAX_CHARS) setSymptomText(e.target.value);
                                         }}
-                                        placeholder={"Example: \"I've had sharp pain in my lower left molar for 3 days.\nIt worsens at night and is sensitive to cold. No swelling.\""}
+                                        placeholder="Example: Sharp pain in lower left molar for 3 days. Worsens at night and sensitive to cold. No swelling."
                                         disabled={loading || (phase !== "INPUT" && phase !== "CLARIFY")}
                                         onKeyDown={(e) => {
                                             if (e.key === "Enter" && !e.shiftKey && phase === "INPUT") {
@@ -572,89 +519,65 @@ export default function ClinicalIntakePage() {
                                                 handleAnalyze();
                                             }
                                         }}
-                                        style={{
-                                            width: "100%",
-                                            minHeight: "100px",
-                                            resize: "vertical",
-                                            padding: "12px",
-                                            paddingBottom: "28px",
-                                            fontSize: "0.875rem",
-                                            lineHeight: 1.6,
-                                            background: "var(--bg-input)",
-                                            border: "1px solid var(--border-primary)",
-                                            borderRadius: "var(--radius-md)",
-                                            color: "var(--text-primary)",
-                                            fontFamily: "inherit",
-                                        }}
+                                        className="w-full min-h-[120px] resize-vertical p-4 pb-10 text-sm leading-relaxed bg-brand-input border border-white/10 rounded-lg text-white placeholder-brand-text-muted focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
                                     />
-                                    <span style={{
-                                        position: "absolute",
-                                        bottom: "8px",
-                                        right: "12px",
-                                        fontSize: "0.6875rem",
-                                        color: charCount > MAX_CHARS * 0.9 ? "var(--clinical-warning)" : "var(--text-disabled)",
-                                    }}>
+                                    <span className={`absolute bottom-3 right-4 text-xs ${charCount > MAX_CHARS * 0.9 ? "text-amber-400" : "text-brand-text-disabled"}`}>
                                         {charCount}/{MAX_CHARS}
                                     </span>
                                 </div>
 
                                 {phase === "INPUT" && (
-                                    <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                                    <div className="flex items-center gap-4">
                                         <button
                                             onClick={handleAnalyze}
                                             disabled={!symptomText.trim() || loading}
-                                            style={{
-                                                padding: "10px 24px",
-                                                background: (!symptomText.trim() || loading) ? "var(--bg-elevated)" : "var(--accent-primary)",
-                                                color: "#fff",
-                                                border: "none",
-                                                borderRadius: "var(--radius-md)",
-                                                fontSize: "0.8125rem",
-                                                fontWeight: 500,
-                                                cursor: (!symptomText.trim() || loading) ? "not-allowed" : "pointer",
-                                                opacity: (!symptomText.trim() || loading) ? 0.5 : 1,
-                                                transition: "background var(--transition-fast)",
-                                            }}
+                                            className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             {loading ? "Processing..." : "Begin Clinical Review"}
                                         </button>
-                                        <span style={{ fontSize: "0.75rem", color: "var(--text-disabled)" }}>
+                                        <span className="text-xs text-brand-text-disabled">
                                             Does not constitute medical advice
                                         </span>
                                     </div>
                                 )}
                             </div>
-                        </Section>
+                        </div>
 
                         {/* System Message */}
                         {systemMessage && phase === "INPUT" && (
-                            <Section title="System Response">
-                                <p style={{ color: "var(--text-secondary)", fontSize: "0.8125rem", margin: 0, lineHeight: 1.7 }}>
+                            <div className="card">
+                                <p className="text-sm text-brand-text-secondary leading-relaxed">
                                     {systemMessage}
                                 </p>
-                            </Section>
+                            </div>
                         )}
 
-                        {/* ── SECTION 2: Reported Concerns ─────────────── */}
+                        {/* SECTION 2: Identified Concerns */}
                         <AnimatePresence>
                             {orchestration && orchestration.routed_issues.length > 0 && phase !== "INPUT" && (
                                 <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15 }}>
-                                    <Section title="Identified Concerns">
-                                        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                                    <div className="card">
+                                        <div className="card-header">
+                                            <h3 className="card-title">Identified Clinical Concerns</h3>
+                                            <p className="card-subtitle">Structured symptom analysis</p>
+                                        </div>
+                                        <div className="flex flex-col gap-3">
                                             {orchestration.routed_issues.map((issue, i) => (
-                                                <div key={i} style={{
-                                                    borderLeft: `3px solid ${urgencyColor(issue.urgency)}`,
-                                                    padding: "12px 16px",
-                                                    background: "var(--bg-input)",
-                                                    borderRadius: "var(--radius-md)",
-                                                }}>
-                                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                                                        <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--text-primary)" }}>
-                                                            Concern {i + 1} — {issue.description}
-                                                        </span>
-                                                        <span style={{
-                                                            fontSize: "0.6875rem",
-                                                            fontWeight: 500,
+                                                <div key={i} className="border-l-4 p-4 bg-brand-input rounded-lg" style={{ borderLeftColor: urgencyColor(issue.urgency) }}>
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <div>
+                                                            <h4 className="text-sm font-semibold text-white mb-1">
+                                                                Concern {i + 1}: {issue.description}
+                                                            </h4>
+                                                            <p className="text-xs text-brand-text-muted">
+                                                                Specialist: {issue.specialist_type}
+                                                                {issue.requires_sedation && " • Sedation capability available"}
+                                                            </p>
+                                                        </div>
+                                                        <span className="badge text-xs px-2 py-1" style={{
+                                                            backgroundColor: `${urgencyColor(issue.urgency)}20`,
+                                                            color: urgencyColor(issue.urgency),
+                                                            border: `1px solid ${urgencyColor(issue.urgency)}40`,
                                                             textTransform: "uppercase",
                                                             letterSpacing: "0.04em",
                                                             color: urgencyColor(issue.urgency),
@@ -689,36 +612,23 @@ export default function ClinicalIntakePage() {
                             )}
                         </AnimatePresence>
 
-                        {/* Emergency */}
+                        {/* Emergency Alert */}
                         {isEmergency && phase !== "INPUT" && (
-                            <div style={{
-                                borderLeft: "3px solid var(--clinical-urgent)",
-                                padding: "16px 18px",
-                                borderRadius: "var(--radius-md)",
-                                background: "var(--bg-card)",
-                                border: "1px solid var(--border-primary)",
-                                borderLeftWidth: "3px",
-                                borderLeftColor: "var(--clinical-urgent)",
-                            }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                                    <AlertTriangle size={14} style={{ color: "var(--clinical-urgent)" }} />
-                                    <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--clinical-urgent)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                            <div className="border-l-4 border-red-500 bg-red-500/10 rounded-lg p-5">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <AlertTriangle size={18} className="text-red-500" />
+                                    <h4 className="text-sm font-semibold text-red-400 uppercase tracking-wider">
                                         Immediate Clinical Attention Required
-                                    </span>
+                                    </h4>
                                 </div>
-                                <p style={{ color: "var(--text-secondary)", fontSize: "0.8125rem", margin: "0 0 10px 0", lineHeight: 1.6 }}>
+                                <p className="text-sm text-red-200 mb-4 leading-relaxed">
                                     {systemMessage || "Your symptoms indicate a condition requiring immediate clinical attention."}
                                 </p>
-                                <div style={{
-                                    padding: "10px 14px",
-                                    background: "var(--bg-input)",
-                                    borderRadius: "var(--radius-md)",
-                                    border: "1px solid var(--border-primary)",
-                                }}>
-                                    <p style={{ fontSize: "0.8125rem", fontWeight: 500, color: "var(--text-primary)", margin: "0 0 4px 0" }}>
+                                <div className="p-4 bg-brand-input rounded-lg border border-white/10">
+                                    <p className="text-sm font-medium text-white mb-2">
                                         Please proceed to the nearest emergency facility or call the clinic directly.
                                     </p>
-                                    <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", margin: 0 }}>
+                                    <p className="text-xs text-brand-text-muted">
                                         Online booking is not available for emergency cases.
                                     </p>
                                 </div>
@@ -769,30 +679,57 @@ export default function ClinicalIntakePage() {
                             )}
                         </AnimatePresence>
 
-                        {/* ── SECTION 4: Risk Assessment ────────────────── */}
+                        {/* SECTION 4: Risk Assessment Grid */}
                         <AnimatePresence>
                             {orchestration && (phase === "RESULTS" || phase === "SLOTS" || phase === "CONFIRM") && (
                                 <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15, delay: 0.05 }}>
-                                    <Section title="Risk Assessment">
-                                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "10px" }}>
-                                            <Metric label="Urgency" value={urgencyLabel(orchestration.overall_urgency)} color={urgencyColor(orchestration.overall_urgency)} />
-                                            <Metric label="Emergency Trigger" value={isEmergency ? "Detected" : "Not Detected"} color={isEmergency ? "var(--clinical-urgent)" : "var(--clinical-safe)"} />
-                                            <Metric label="Airway Risk" value={breathingDifficulty ? "Reported" : "Not Reported"} color={breathingDifficulty ? "var(--clinical-urgent)" : "var(--clinical-safe)"} />
-                                            <Metric
-                                                label="Clinical Status"
-                                                value={triageStatus}
-                                                color={triageStatus === "Specialist Evaluation Identified" ? "var(--success-text)" : "var(--clinical-info)"}
-                                            />
+                                    <div className="card">
+                                        <div className="card-header">
+                                            <h3 className="card-title">Clinical Risk Assessment</h3>
+                                            <p className="card-subtitle">Automated triage evaluation</p>
                                         </div>
+                                        
+                                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                                            <div className="p-4 bg-brand-input rounded-lg border border-white/5">
+                                                <h6 className="text-xs font-semibold text-brand-text-muted uppercase tracking-wider mb-2">
+                                                    Urgency Level
+                                                </h6>
+                                                <div className="text-sm font-semibold" style={{ color: urgencyColor(orchestration.overall_urgency) }}>
+                                                    {urgencyLabel(orchestration.overall_urgency)}
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="p-4 bg-brand-input rounded-lg border border-white/5">
+                                                <h6 className="text-xs font-semibold text-brand-text-muted uppercase tracking-wider mb-2">
+                                                    Emergency Status
+                                                </h6>
+                                                <div className="text-sm font-semibold" style={{ color: isEmergency ? "var(--clinical-urgent)" : "var(--clinical-safe)" }}>
+                                                    {isEmergency ? "Detected" : "Not Detected"}
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="p-4 bg-brand-input rounded-lg border border-white/5">
+                                                <h6 className="text-xs font-semibold text-brand-text-muted uppercase tracking-wider mb-2">
+                                                    Airway Risk
+                                                </h6>
+                                                <div className="text-sm font-semibold" style={{ color: breathingDifficulty ? "var(--clinical-urgent)" : "var(--clinical-safe)" }}>
+                                                    {breathingDifficulty ? "Reported" : "Not Reported"}
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="p-4 bg-brand-input rounded-lg border border-white/5">
+                                                <h6 className="text-xs font-semibold text-brand-text-muted uppercase tracking-wider mb-2">
+                                                    Clinical Status
+                                                </h6>
+                                                <div className="text-sm font-semibold text-white">
+                                                    {triageStatus}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
                                         {bookingBlocked && (
-                                            <div style={{
-                                                marginTop: "12px",
-                                                padding: "10px 14px",
-                                                background: "var(--bg-input)",
-                                                borderRadius: "var(--radius-md)",
-                                                borderLeft: "3px solid var(--clinical-warning)",
-                                            }}>
-                                                <p style={{ fontSize: "0.8125rem", fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
+                                            <div className="border-l-4 border-amber-500 bg-amber-500/10 rounded-lg p-4 mb-3">
+                                                <p className="text-sm font-medium text-amber-200">
                                                     {isEmergency
                                                         ? "Online booking is disabled for emergency cases. Please contact the clinic directly."
                                                         : "Clinical review required before booking. Additional information may be needed."
@@ -800,259 +737,247 @@ export default function ClinicalIntakePage() {
                                                 </p>
                                             </div>
                                         )}
-                                        <div style={{
-                                            marginTop: "10px",
-                                            fontSize: "0.75rem",
-                                            color: "var(--text-disabled)",
-                                            lineHeight: 1.5,
-                                        }}>
+                                        
+                                        <p className="text-xs text-brand-text-disabled leading-relaxed">
                                             Clinical review required — all assessments are subject to provider verification
-                                        </div>
-                                    </Section>
+                                        </p>
+                                    </div>
                                 </motion.div>
                             )}
                         </AnimatePresence>
 
-                        {/* ── SECTION 5: Routing ────────────────────────── */}
+                        {/* SECTION 5: Specialist Routing Recommendation */}
                         <AnimatePresence>
                             {orchestration && orchestration.routed_issues.length > 0 && (phase === "RESULTS" || phase === "SLOTS" || phase === "CONFIRM") && (
                                 <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15, delay: 0.1 }}>
-                                    <Section title="Proposed Specialist Evaluation">
-                                        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                                    <div className="card">
+                                        <div className="card-header">
+                                            <h3 className="card-title">Specialist Evaluation Recommendation</h3>
+                                            <p className="card-subtitle">Constraint-based clinical routing</p>
+                                        </div>
 
-                                            {/* Disclaimer Banner */}
-                                            <div style={{
-                                                padding: "10px 12px",
-                                                marginBottom: "10px",
-                                                background: "var(--info-subtle)",
-                                                border: "1px solid var(--clinical-info)",
-                                                borderRadius: "var(--radius-md)",
-                                                fontSize: "0.75rem",
-                                                color: "var(--text-secondary)",
-                                                lineHeight: 1.5,
-                                            }}>
-                                                <strong>Routing Recommendation:</strong> Based on reported symptoms and structured intake responses. Final clinical decisions are made by the treating provider.
-                                            </div>
+                                        {/* Liability Disclaimer */}
+                                        <div className="p-3 mb-4 bg-indigo-500/10 border border-indigo-500/20 rounded-lg">
+                                            <p className="text-xs text-indigo-200 leading-relaxed">
+                                                <strong>Routing Recommendation:</strong> Based on reported symptoms and structured intake responses. 
+                                                Final clinical decisions are made by the treating provider.
+                                            </p>
+                                        </div>
 
+                                        <div className="flex flex-col gap-3">
                                             {orchestration.routed_issues.map((issue, i) => (
-                                                <div key={i} style={{
-                                                    padding: "12px 14px", background: "var(--bg-input)",
-                                                    borderRadius: "var(--radius-md)",
-                                                    borderLeft: `3px solid ${urgencyColor(issue.urgency)}`,
-                                                }}>
-                                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                                        <div>
-                                                            <div style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--text-primary)" }}>
+                                                <div key={i} className="p-4 bg-brand-input rounded-lg border border-white/5 hover:border-white/10 transition-colors">
+                                                    <div className="flex justify-between items-start mb-3">
+                                                        <div className="flex-1">
+                                                            <h4 className="text-sm font-semibold text-white mb-1">
                                                                 {issue.procedure_name || `${issue.specialist_type} Evaluation`}
-                                                            </div>
-                                                            <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "2px" }}>
-                                                                {issue.specialist_type} · {issue.appointment_type || "Consultation"} · {issue.duration_minutes || 30} min
-                                                            </div>
+                                                            </h4>
+                                                            <p className="text-xs text-brand-text-muted">
+                                                                {issue.specialist_type} • {issue.appointment_type || "Consultation"} • {issue.duration_minutes || 30} min
+                                                            </p>
                                                         </div>
-                                                        <ChevronRight size={14} style={{ color: "var(--text-disabled)" }} />
+                                                        <ChevronRight size={16} className="text-brand-text-disabled" />
                                                     </div>
-                                                    {/* Room & Equipment constraints */}
+
+                                                    {/* Resource Requirements */}
                                                     {(issue.room_capability || issue.requires_sedation || issue.requires_anesthetist) && (
-                                                        <div style={{
-                                                            display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap",
-                                                        }}>
-                                                            {issue.room_capability && Object.entries(issue.room_capability).filter(([, v]) => v === true).map(([k]) => (
-                                                                <span key={k} style={{
-                                                                    fontSize: "0.6875rem", padding: "2px 8px",
-                                                                    background: "var(--bg-elevated)", borderRadius: "var(--radius-sm)",
-                                                                    color: "var(--text-secondary)", border: "1px solid var(--border-primary)",
-                                                                }}>
-                                                                    {k.charAt(0).toUpperCase() + k.slice(1)}
-                                                                </span>
-                                                            ))}
+                                                        <div className="flex flex-wrap gap-2 mb-2">
+                                                            {issue.room_capability && Object.entries(issue.room_capability)
+                                                                .filter(([, v]) => v === true)
+                                                                .map(([k]) => (
+                                                                    <span key={k} className="text-xs px-2 py-1 bg-brand-elevated rounded border border-white/10 text-brand-text-secondary">
+                                                                        {k.charAt(0).toUpperCase() + k.slice(1)}
+                                                                    </span>
+                                                                ))}
                                                             {issue.requires_sedation && (
-                                                                <span style={{
-                                                                    fontSize: "0.6875rem", padding: "2px 8px",
-                                                                    background: "var(--bg-elevated)", // Neutral bg
-                                                                    borderRadius: "var(--radius-sm)",
-                                                                    color: "var(--text-secondary)", // Neutral text
-                                                                    border: "1px solid var(--border-primary)",
-                                                                }}>
-                                                                    Sedation Capability Available
+                                                                <span className="text-xs px-2 py-1 bg-brand-elevated rounded border border-white/10 text-brand-text-secondary">
+                                                                    Sedation Capability
                                                                 </span>
                                                             )}
                                                             {issue.requires_anesthetist && (
-                                                                <span style={{
-                                                                    fontSize: "0.6875rem", padding: "2px 8px",
-                                                                    background: "var(--bg-elevated)",
-                                                                    borderRadius: "var(--radius-sm)",
-                                                                    color: "var(--text-secondary)",
-                                                                    border: "1px solid var(--border-primary)",
-                                                                }}>
+                                                                <span className="text-xs px-2 py-1 bg-brand-elevated rounded border border-white/10 text-brand-text-secondary">
                                                                     Anesthetist Available
                                                                 </span>
                                                             )}
                                                         </div>
                                                     )}
-                                                    {/* Fallback tier info */}
+
+                                                    {/* Fallback Tier Notice */}
                                                     {issue.fallback_tier > 1 && issue.fallback_note && (
-                                                        <div style={{
-                                                            marginTop: "6px", fontSize: "0.6875rem",
-                                                            color: "var(--clinical-info)", fontStyle: "italic",
-                                                        }}>
+                                                        <p className="text-xs text-indigo-400 italic mt-2">
                                                             {issue.fallback_note}
-                                                        </div>
+                                                        </p>
                                                     )}
                                                 </div>
                                             ))}
+
                                             {orchestration.combined_visit_possible && (
-                                                <div style={{
-                                                    fontSize: "0.75rem", color: "var(--clinical-info)",
-                                                    padding: "8px 12px", background: "var(--info-subtle)",
-                                                    borderRadius: "var(--radius-md)",
-                                                }}>
-                                                    Combined visit possible — appointments may be scheduled together to minimize visits
+                                                <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-lg">
+                                                    <p className="text-xs text-indigo-200">
+                                                        Combined visit possible — appointments may be scheduled together to minimize visits
+                                                    </p>
                                                 </div>
                                             )}
                                         </div>
-                                    </Section>
+                                    </div>
                                 </motion.div>
                             )}
                         </AnimatePresence>
 
-                        {/* ── SECTION 6: Slots ─────────────────────────── */}
+                        {/* SECTION 6: Available Appointment Slots */}
                         <AnimatePresence>
                             {(phase === "SLOTS" || phase === "CONFIRM") && slots.length > 0 && (
                                 <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15, delay: 0.15 }}>
-                                    <Section title={`Available Appointments (${slots.length})`}>
-                                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                    <div className="card">
+                                        <div className="card-header">
+                                            <h3 className="card-title">Available Appointments ({slots.length})</h3>
+                                            <p className="card-subtitle">Select your preferred time slot</p>
+                                        </div>
+                                        
+                                        <div className="flex flex-col gap-2">
                                             {slots.slice(0, 8).map((slot, i) => (
                                                 <button
                                                     key={i}
                                                     onClick={() => { setSelectedSlot(slot); setPhase("CONFIRM"); }}
-                                                    style={{
-                                                        display: "grid", gridTemplateColumns: "90px 70px 1fr auto",
-                                                        gap: "12px", alignItems: "center",
-                                                        padding: "10px 14px", width: "100%", textAlign: "left",
-                                                        background: selectedSlot === slot ? "var(--accent-subtle)" : "var(--bg-input)",
-                                                        border: `1px solid ${selectedSlot === slot ? "var(--accent-primary)" : "var(--border-primary)"}`,
-                                                        borderRadius: "var(--radius-md)", cursor: "pointer",
-                                                        color: "var(--text-primary)", fontSize: "0.8125rem",
-                                                        fontFamily: "inherit", transition: "border-color var(--transition-fast)",
-                                                    }}
+                                                    className={`grid grid-cols-[100px_80px_1fr_auto] gap-4 items-center p-4 w-full text-left rounded-lg border transition-all ${
+                                                        selectedSlot === slot
+                                                            ? "bg-indigo-500/10 border-indigo-500"
+                                                            : "bg-brand-input border-white/5 hover:border-white/20"
+                                                    }`}
                                                 >
-                                                    <span style={{ fontWeight: 500 }}>{slot.date}</span>
-                                                    <span style={{ color: "var(--accent-primary)", fontWeight: 500 }}>{slot.time}</span>
-                                                    <span style={{ color: "var(--text-secondary)" }}>{slot.doctor_name} — {slot.clinic_name}</span>
-                                                    <span style={{ fontSize: "0.6875rem", color: "var(--text-muted)" }}>{slot.duration_minutes} min</span>
+                                                    <span className="text-sm font-medium text-white">{slot.date}</span>
+                                                    <span className="text-sm font-semibold text-indigo-400">{slot.time}</span>
+                                                    <div className="min-w-0">
+                                                        <p className="text-sm text-brand-text-secondary truncate">
+                                                            {slot.doctor_name}
+                                                        </p>
+                                                        <p className="text-xs text-brand-text-muted truncate">
+                                                            {slot.clinic_name}
+                                                        </p>
+                                                    </div>
+                                                    <span className="text-xs text-brand-text-muted whitespace-nowrap">
+                                                        {slot.duration_minutes} min
+                                                    </span>
                                                 </button>
                                             ))}
                                         </div>
-                                    </Section>
+                                    </div>
                                 </motion.div>
                             )}
                         </AnimatePresence>
 
-                        {/* ── SECTION 7: Confirm ───────────────────────── */}
+                        {/* SECTION 7: Appointment Confirmation */}
                         <AnimatePresence>
                             {phase === "CONFIRM" && selectedSlot && (
                                 <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15 }}>
-                                    <Section title="Confirm Appointment">
-                                        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                                            <div style={{
-                                                display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px",
-                                                padding: "14px", background: "var(--bg-input)", borderRadius: "var(--radius-md)",
-                                            }}>
-                                                <DetailField icon={<Calendar size={13} />} label="Date" value={selectedSlot.date} />
-                                                <DetailField icon={<Clock size={13} />} label="Time" value={`${selectedSlot.time} – ${selectedSlot.end_time}`} />
-                                                <DetailField icon={<User size={13} />} label="Provider" value={selectedSlot.doctor_name} />
-                                                <DetailField icon={<Activity size={13} />} label="Reserved Evaluation Time" value={`${selectedSlot.duration_minutes} min`} />
+                                    <div className="card">
+                                        <div className="card-header">
+                                            <h3 className="card-title">Confirm Appointment</h3>
+                                            <p className="card-subtitle">Review and finalize booking</p>
+                                        </div>
+
+                                        {/* Appointment Details Grid */}
+                                        <div className="grid grid-cols-2 gap-4 p-4 bg-brand-input rounded-lg mb-4">
+                                            <div className="flex items-start gap-3">
+                                                <Calendar size={16} className="text-brand-text-muted mt-0.5" />
+                                                <div>
+                                                    <p className="text-xs text-brand-text-muted uppercase tracking-wider mb-1">Date</p>
+                                                    <p className="text-sm font-medium text-white">{selectedSlot.date}</p>
+                                                </div>
                                             </div>
-                                            <Field label="Notes for Provider (optional)">
-                                                <textarea
-                                                    value={bookingNotes} onChange={(e) => setBookingNotes(e.target.value)}
-                                                    placeholder="Any additional information..."
-                                                    style={{
-                                                        width: "100%", minHeight: "56px", resize: "vertical",
-                                                        padding: "9px 12px", fontSize: "0.8125rem", lineHeight: 1.6,
-                                                        background: "var(--bg-input)", border: "1px solid var(--border-primary)",
-                                                        borderRadius: "var(--radius-md)", color: "var(--text-primary)", fontFamily: "inherit",
-                                                    }}
-                                                />
-                                            </Field>
-                                            <div style={{ display: "flex", gap: "10px" }}>
-                                                {bookingBlocked ? (
-                                                    <div style={{
-                                                        flex: 1,
-                                                        padding: "12px 16px",
-                                                        background: "var(--bg-input)",
-                                                        borderRadius: "var(--radius-md)",
-                                                        borderLeft: "3px solid var(--clinical-warning)",
-                                                    }}>
-                                                        <p style={{ fontSize: "0.8125rem", fontWeight: 500, color: "var(--text-primary)", margin: "0 0 4px 0" }}>
-                                                            {isEmergency
-                                                                ? "Online booking is not available for emergency cases."
-                                                                : "Additional clinical review is required before booking."
-                                                            }
-                                                        </p>
-                                                        <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", margin: 0 }}>
-                                                            Please contact the clinic directly to schedule your appointment.
-                                                        </p>
-                                                    </div>
-                                                ) : (
+                                            <div className="flex items-start gap-3">
+                                                <Clock size={16} className="text-brand-text-muted mt-0.5" />
+                                                <div>
+                                                    <p className="text-xs text-brand-text-muted uppercase tracking-wider mb-1">Time</p>
+                                                    <p className="text-sm font-medium text-white">{selectedSlot.time} – {selectedSlot.end_time}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-start gap-3">
+                                                <User size={16} className="text-brand-text-muted mt-0.5" />
+                                                <div>
+                                                    <p className="text-xs text-brand-text-muted uppercase tracking-wider mb-1">Provider</p>
+                                                    <p className="text-sm font-medium text-white">{selectedSlot.doctor_name}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-start gap-3">
+                                                <Activity size={16} className="text-brand-text-muted mt-0.5" />
+                                                <div>
+                                                    <p className="text-xs text-brand-text-muted uppercase tracking-wider mb-1">Duration</p>
+                                                    <p className="text-sm font-medium text-white">{selectedSlot.duration_minutes} min</p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Optional Notes */}
+                                        <div className="mb-4">
+                                            <label className="block text-sm font-medium text-brand-text-secondary mb-2">
+                                                Notes for Provider (optional)
+                                            </label>
+                                            <textarea
+                                                value={bookingNotes}
+                                                onChange={(e) => setBookingNotes(e.target.value)}
+                                                placeholder="Any additional information..."
+                                                className="w-full min-h-[80px] resize-vertical p-3 text-sm leading-relaxed bg-brand-input border border-white/10 rounded-lg text-white placeholder-brand-text-muted focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                                            />
+                                        </div>
+
+                                        {/* Action Buttons */}
+                                        <div className="flex gap-3">
+                                            {bookingBlocked ? (
+                                                <div className="flex-1 border-l-4 border-amber-500 bg-amber-500/10 rounded-lg p-4">
+                                                    <p className="text-sm font-medium text-amber-200 mb-2">
+                                                        {isEmergency
+                                                            ? "Online booking is not available for emergency cases."
+                                                            : "Additional clinical review is required before booking."
+                                                        }
+                                                    </p>
+                                                    <p className="text-xs text-amber-300/70">
+                                                        Please contact the clinic directly to schedule your appointment.
+                                                    </p>
+                                                </div>
+                                            ) : (
+                                                <>
                                                     <button
-                                                        onClick={handleConfirmBooking} disabled={loading}
-                                                        style={{
-                                                            padding: "10px 24px",
-                                                            background: loading ? "var(--bg-elevated)" : "var(--accent-primary)",
-                                                            color: "#fff", border: "none", borderRadius: "var(--radius-md)",
-                                                            fontSize: "0.8125rem", fontWeight: 500,
-                                                            cursor: loading ? "not-allowed" : "pointer",
-                                                            opacity: loading ? 0.5 : 1,
-                                                            transition: "background var(--transition-fast)",
-                                                        }}
+                                                        onClick={handleConfirmBooking}
+                                                        disabled={loading}
+                                                        className="btn-primary flex-1"
                                                     >
                                                         {loading ? "Booking..." : "Confirm Appointment"}
                                                     </button>
-                                                )}
-                                                <button
-                                                    onClick={() => { setSelectedSlot(null); setPhase("SLOTS"); }}
-                                                    style={{
-                                                        padding: "10px 24px", background: "transparent",
-                                                        color: "var(--text-secondary)", border: "1px solid var(--border-primary)",
-                                                        borderRadius: "var(--radius-md)", fontSize: "0.8125rem", cursor: "pointer",
-                                                    }}
-                                                >
-                                                    Back
-                                                </button>
-                                            </div>
+                                                    <button
+                                                        onClick={() => { setSelectedSlot(null); setPhase("SLOTS"); }}
+                                                        className="btn-secondary"
+                                                    >
+                                                        Back
+                                                    </button>
+                                                </>
+                                            )}
                                         </div>
-                                    </Section>
+                                    </div>
                                 </motion.div>
                             )}
                         </AnimatePresence>
 
-                        {/* ── Booked ───────────────────────────────────── */}
+                        {/* Booking Confirmation Success */}
                         <AnimatePresence>
                             {phase === "BOOKED" && (
                                 <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15 }}>
-                                    <div style={{
-                                        borderLeft: "3px solid var(--clinical-safe)",
-                                        padding: "16px", borderRadius: "var(--radius-md)",
-                                        background: "var(--bg-card)", border: "1px solid var(--border-primary)",
-                                        borderLeftWidth: "3px", borderLeftColor: "var(--clinical-safe)",
-                                    }}>
-                                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
-                                            <CheckCircle2 size={14} style={{ color: "var(--clinical-safe)" }} />
-                                            <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--clinical-safe)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                                    <div className="border-l-4 border-emerald-500 bg-emerald-500/10 rounded-lg p-5">
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <CheckCircle2 size={18} className="text-emerald-500" />
+                                            <h4 className="text-sm font-semibold text-emerald-400 uppercase tracking-wider">
                                                 Appointment Confirmed
-                                            </span>
+                                            </h4>
                                         </div>
                                         {selectedSlot && (
-                                            <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: "0 0 12px 0" }}>
+                                            <p className="text-sm text-emerald-200 mb-4">
                                                 {selectedSlot.date} at {selectedSlot.time} with {selectedSlot.doctor_name}
                                             </p>
                                         )}
-                                        <button onClick={handleNewIntake} style={{
-                                            padding: "8px 16px", background: "transparent",
-                                            color: "var(--text-secondary)", border: "1px solid var(--border-primary)",
-                                            borderRadius: "var(--radius-md)", fontSize: "0.75rem", cursor: "pointer",
-                                        }}>
+                                        <button
+                                            onClick={handleNewIntake}
+                                            className="btn-secondary text-sm"
+                                        >
                                             New Intake
                                         </button>
                                     </div>
@@ -1061,86 +986,85 @@ export default function ClinicalIntakePage() {
                         </AnimatePresence>
                     </div>
 
-                    {/* ── RIGHT PANEL ───────────────────────────────────── */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: "12px", position: "sticky", top: "24px" }}>
-                        {/* Case Summary */}
-                        <div style={{
-                            background: "var(--bg-card)", border: "1px solid var(--border-primary)",
-                            borderRadius: "var(--radius-lg)", padding: "16px",
-                        }}>
-                            <div style={{
-                                fontSize: "0.6875rem", fontWeight: 600, textTransform: "uppercase",
-                                letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: "14px",
-                            }}>
+                    {/* RIGHT PANEL - Case Summary */}
+                    <div className="flex flex-col gap-4 sticky top-6">
+                        {/* Case Summary Card */}
+                        <div className="card">
+                            <h6 className="text-xs font-semibold text-brand-text-muted uppercase tracking-wider mb-4">
                                 Case Summary
-                            </div>
-                            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                                <SummaryRow label="Status" value={
-                                    phase === "INPUT" ? "Awaiting Information" :
-                                        phase === "CLARIFY" ? "Pending Clarification" :
-                                            phase === "RESULTS" ? "Under Review" :
-                                                phase === "SLOTS" ? "Slot Selection" :
-                                                    phase === "CONFIRM" ? "Pending Confirmation" :
-                                                        "Complete"
-                                } />
-                                <SummaryRow
-                                    label="Urgency"
-                                    value={orchestration ? urgencyLabel(orchestration.overall_urgency) : "—"}
-                                    color={orchestration ? urgencyColor(orchestration.overall_urgency) : undefined}
-                                />
-                                <SummaryRow
-                                    label="Issues Identified"
-                                    value={orchestration ? `${Math.max(orchestration.routed_issues.length, isEmergency ? 1 : 0)}` : "—"}
-                                />
-                                <SummaryRow
-                                    label="Risk Flags"
-                                    value={
-                                        isEmergency
-                                            ? (breathingDifficulty ? "Emergency · Airway" : "Emergency")
-                                            : "None"
-                                    }
-                                    color={
-                                        isEmergency
-                                            ? "var(--clinical-urgent)" : undefined
-                                    }
-                                />
-                                <SummaryRow label="Last Updated" value={lastUpdated || "—"} />
+                            </h6>
+                            <div className="flex flex-col gap-3">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs text-brand-text-muted">Status</span>
+                                    <span className="text-xs font-medium text-white">
+                                        {phase === "INPUT" ? "Awaiting Information" :
+                                            phase === "CLARIFY" ? "Pending Clarification" :
+                                                phase === "RESULTS" ? "Under Review" :
+                                                    phase === "SLOTS" ? "Slot Selection" :
+                                                        phase === "CONFIRM" ? "Pending Confirmation" :
+                                                            "Complete"}
+                                    </span>
+                                </div>
+                                
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs text-brand-text-muted">Urgency</span>
+                                    <span className="text-xs font-medium" style={{ 
+                                        color: orchestration ? urgencyColor(orchestration.overall_urgency) : "var(--text-white)" 
+                                    }}>
+                                        {orchestration ? urgencyLabel(orchestration.overall_urgency) : "—"}
+                                    </span>
+                                </div>
+                                
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs text-brand-text-muted">Issues Identified</span>
+                                    <span className="text-xs font-medium text-white">
+                                        {orchestration ? `${Math.max(orchestration.routed_issues.length, isEmergency ? 1 : 0)}` : "—"}
+                                    </span>
+                                </div>
+                                
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs text-brand-text-muted">Risk Flags</span>
+                                    <span className="text-xs font-medium" style={{ 
+                                        color: isEmergency ? "var(--clinical-urgent)" : "var(--text-white)" 
+                                    }}>
+                                        {isEmergency ? (breathingDifficulty ? "Emergency • Airway" : "Emergency") : "None"}
+                                    </span>
+                                </div>
+                                
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs text-brand-text-muted">Last Updated</span>
+                                    <span className="text-xs font-medium text-white">{lastUpdated || "—"}</span>
+                                </div>
                             </div>
 
-                            {/* Selected Slot */}
+                            {/* Selected Slot Preview */}
                             {selectedSlot && (
-                                <div style={{ borderTop: "1px solid var(--border-primary)", paddingTop: "10px", marginTop: "10px" }}>
-                                    <div style={{
-                                        fontSize: "0.6875rem", fontWeight: 600, textTransform: "uppercase",
-                                        letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: "6px",
-                                    }}>
+                                <div className="pt-4 mt-4 border-t border-white/5">
+                                    <h6 className="text-xs font-semibold text-brand-text-muted uppercase tracking-wider mb-2">
                                         Selected Appointment
-                                    </div>
-                                    <div style={{ fontSize: "0.8125rem", color: "var(--text-primary)" }}>{selectedSlot.date} at {selectedSlot.time}</div>
-                                    <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "2px" }}>{selectedSlot.doctor_name}</div>
+                                    </h6>
+                                    <p className="text-sm font-medium text-white mb-1">
+                                        {selectedSlot.date} at {selectedSlot.time}
+                                    </p>
+                                    <p className="text-xs text-brand-text-secondary">
+                                        {selectedSlot.doctor_name}
+                                    </p>
                                 </div>
                             )}
                         </div>
 
-                        {/* Disclaimer */}
-                        <div style={{
-                            padding: "14px", background: "var(--bg-card)",
-                            border: "1px solid var(--border-primary)", borderRadius: "var(--radius-md)",
-                        }}>
-                            <div style={{
-                                display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px",
-                            }}>
-                                <Shield size={12} style={{ color: "var(--text-muted)" }} />
-                                <span style={{
-                                    fontSize: "0.6875rem", fontWeight: 600, textTransform: "uppercase",
-                                    letterSpacing: "0.06em", color: "var(--text-muted)",
-                                }}>
+                        {/* Clinical Safety Notice */}
+                        <div className="card">
+                            <div className="flex items-center gap-2 mb-3">
+                                <Shield size={14} className="text-brand-text-muted" />
+                                <h6 className="text-xs font-semibold text-brand-text-muted uppercase tracking-wider">
                                     Clinical Safety Notice
-                                </span>
+                                </h6>
                             </div>
-                            <div style={{ fontSize: "0.75rem", color: "var(--text-disabled)", lineHeight: 1.6 }}>
-                                This system assists with appointment routing only. It does not provide diagnosis or treatment. All cases are reviewed by licensed dental professionals.
-                            </div>
+                            <p className="text-xs text-brand-text-disabled leading-relaxed">
+                                This system assists with appointment routing only. It does not provide diagnosis or treatment. 
+                                All cases are reviewed by licensed dental professionals.
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -1150,21 +1074,15 @@ export default function ClinicalIntakePage() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// SUB-COMPONENTS
+// HELPER COMPONENTS
 // ══════════════════════════════════════════════════════════════════════════════
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
     return (
-        <div style={{
-            background: "var(--bg-card)", border: "1px solid var(--border-primary)",
-            borderRadius: "var(--radius-lg)", padding: "20px",
-        }}>
-            <div style={{
-                fontSize: "0.6875rem", fontWeight: 600, textTransform: "uppercase",
-                letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: "14px",
-            }}>
+        <div className="card">
+            <h6 className="text-xs font-semibold text-brand-text-muted uppercase tracking-wider mb-4">
                 {title}
-            </div>
+            </h6>
             {children}
         </div>
     );
@@ -1172,8 +1090,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
-            <label style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", fontWeight: 500 }}>{label}</label>
+        <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-brand-text-secondary">{label}</label>
             {children}
         </div>
     );
@@ -1181,31 +1099,35 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function Metric({ label, value, color }: { label: string; value: string; color: string }) {
     return (
-        <div style={{ padding: "10px 12px", background: "var(--bg-input)", borderRadius: "var(--radius-md)" }}>
-            <div style={{ fontSize: "0.6875rem", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--text-muted)", marginBottom: "3px" }}>
+        <div className="p-3 bg-brand-input rounded-lg">
+            <h6 className="text-xs font-medium text-brand-text-muted uppercase tracking-wider mb-1">
                 {label}
+            </h6>
+            <div className="text-sm font-semibold" style={{ color }}>
+                {value}
             </div>
-            <div style={{ fontSize: "0.8125rem", fontWeight: 600, color }}>{value}</div>
         </div>
     );
 }
 
 function SummaryRow({ label, value, color }: { label: string; value: string; color?: string }) {
     return (
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{label}</span>
-            <span style={{ fontSize: "0.75rem", fontWeight: 500, color: color || "var(--text-primary)" }}>{value}</span>
+        <div className="flex justify-between items-center">
+            <span className="text-xs text-brand-text-muted">{label}</span>
+            <span className="text-xs font-medium" style={{ color: color || "var(--text-primary)" }}>
+                {value}
+            </span>
         </div>
     );
 }
 
 function DetailField({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
     return (
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ color: "var(--text-muted)" }}>{icon}</span>
+        <div className="flex items-start gap-3">
+            <span className="text-brand-text-muted mt-0.5">{icon}</span>
             <div>
-                <div style={{ fontSize: "0.6875rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</div>
-                <div style={{ fontSize: "0.8125rem", color: "var(--text-primary)", fontWeight: 500 }}>{value}</div>
+                <p className="text-xs text-brand-text-muted uppercase tracking-wider mb-1">{label}</p>
+                <p className="text-sm font-medium text-white">{value}</p>
             </div>
         </div>
     );

@@ -19,6 +19,7 @@ import {
     ChevronLeft,
     ChevronRight,
     Shield,
+    Activity,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -63,25 +64,25 @@ export default function Sidebar({
             name: "Overview",
             href: "/patient/overview",
             icon: LayoutDashboard,
-            description: "Dashboard & quick actions",
+            description: "Dashboard overview",
         },
         {
             name: "Book Appointment",
             href: "/chat",
             icon: MessageSquarePlus,
-            description: "AI-powered scheduling",
+            description: "Clinical intake",
         },
         {
-            name: "My Appointments",
+            name: "Appointments",
             href: "/patient/appointments",
             icon: CalendarDays,
-            description: "View & manage visits",
+            description: "View schedule",
         },
         {
             name: "Profile",
             href: "/patient/profile",
             icon: User,
-            description: "Personal settings",
+            description: "Account settings",
         },
     ];
 
@@ -90,37 +91,37 @@ export default function Sidebar({
             name: "Dashboard",
             href: "/admin/dashboard",
             icon: LayoutDashboard,
-            description: "Operations overview",
+            description: "Operations center",
         },
         {
-            name: "Doctors",
+            name: "Providers",
             href: "/admin/doctors",
             icon: Stethoscope,
-            description: "Specialist management",
+            description: "Specialist roster",
         },
         {
-            name: "Rooms",
+            name: "Facilities",
             href: "/admin/rooms",
             icon: Building2,
             description: "Resource allocation",
         },
         {
-            name: "Appointments",
+            name: "Schedule",
             href: "/admin/appointments",
             icon: CalendarDays,
-            description: "Schedule management",
+            description: "Appointment grid",
         },
         {
             name: "Analytics",
             href: "/admin/analytics",
             icon: BarChart3,
-            description: "Performance insights",
+            description: "Performance metrics",
         },
         {
             name: "Patients",
             href: "/admin/patients",
             icon: Users,
-            description: "Patient records",
+            description: "Patient registry",
         },
     ];
 
@@ -164,8 +165,8 @@ export default function Sidebar({
                         href="/"
                         className={`flex items-center gap-3 ${!isOpen && "justify-center"}`}
                     >
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg">
-                            <img src="/logo.png" alt="Bronn Logo" className="h-full w-full object-cover" />
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-indigo-600">
+                            <Activity size={20} className="text-white" />
                         </div>
                         <AnimatePresence>
                             {isOpen && (
@@ -173,9 +174,9 @@ export default function Sidebar({
                                     initial={{ opacity: 0, x: -10 }}
                                     animate={{ opacity: 1, x: 0 }}
                                     exit={{ opacity: 0, x: -10 }}
-                                    className="whitespace-nowrap text-xl font-black tracking-tight text-white"
+                                    className="whitespace-nowrap text-base font-semibold tracking-tight text-white"
                                 >
-                                    Bronn
+                                    Clinical Platform
                                 </motion.span>
                             )}
                         </AnimatePresence>
@@ -277,16 +278,16 @@ export default function Sidebar({
                             className="mx-3 mb-4 overflow-hidden"
                         >
                             <div className="rounded-xl border border-white/5 bg-brand-secondary p-3">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 mb-2">
                                     <span className="relative flex h-2 w-2">
                                         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
                                         <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
                                     </span>
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-brand-text-muted">
+                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400">
                                         System Operational
                                     </span>
                                 </div>
-                                <div className="mt-2 flex items-center gap-1.5 text-[10px] text-emerald-500/80">
+                                <div className="flex items-center gap-1.5 text-[10px] text-brand-text-muted">
                                     <Shield size={10} />
                                     <span className="font-medium">HIPAA Compliant</span>
                                 </div>
