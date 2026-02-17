@@ -67,7 +67,7 @@ export default function Sidebar({
         },
         {
             name: "Book Appointment",
-            href: "/patient/book",
+            href: "/chat",
             icon: MessageSquarePlus,
             description: "AI-powered scheduling",
         },

@@ -310,7 +310,7 @@ def book_appointment(
     db: Session,
     slot: dict,
     patient_id: str,
-    proc_id: int,
+    proc_id: int | None = None,
     *,
     tenant_id: PyUUID | None = None,
 ) -> dict:

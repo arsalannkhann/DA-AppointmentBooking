@@ -1,674 +1,1212 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { motion, AnimatePresence, Variants } from "framer-motion";
+import { useState, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-    Send,
-    Calendar,
-    Clock,
-    MapPin,
-    User,
-    Stethoscope,
-    AlertCircle,
-    CheckCircle2,
-    X,
+    AlertTriangle,
     ChevronRight,
-    Sparkles,
+    Clock,
+    Calendar,
+    CheckCircle2,
     Shield,
-    RotateCcw,
-    ArrowRight,
+    Activity,
+    User,
 } from "lucide-react";
 import DashboardLayout from "@/components/DashboardLayout";
-import { analyzeSymptoms, searchSlots, bookAppointment } from "@/lib/api";
+import { analyzeSymptoms, searchSlotsBySpecialist, bookAppointment } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
+import { ClarificationPanel } from "@/components/DynamicClarification";
 
-interface Message {
-    role: "assistant" | "user";
-    content: string;
-    slots?: SlotData[];
-    emergency?: boolean;
-    emergencySlot?: Record<string, unknown>;
-    booked?: boolean;
-    triage?: TriageData;
+// ── Types ────────────────────────────────────────────────────────────────────
+
+interface ClinicalIssue {
+    symptom_cluster: string;
+    has_pain: boolean;
+    severity?: number;
+    duration_days?: number;
+    swelling: boolean;
+    airway_compromise: boolean;
+    location?: string;
+    thermal_sensitivity: boolean;
+    biting_pain: boolean;
+    trauma: boolean;
+    bleeding: boolean;
+    impacted_wisdom: boolean;
+}
+
+interface RoutedIssue {
+    specialist_type: string;
+    urgency: string;
+    requires_sedation: boolean;
+    description: string;
+    symptoms: string[];
+    reasoning_triggers: string[]; // Added for reasoning traceability
+    // Constraint-aware fields
+    procedure_id: number | null;
+    procedure_name: string;
+    appointment_type: string;
+    duration_minutes: number;
+    consult_minutes: number;
+    room_capability: Record<string, boolean> | null;
+    requires_anesthetist: boolean;
+    slots: {
+        tier: number;
+        tier_label: string;
+        combo_slots: SlotData[];
+        single_slots: SlotData[];
+        total_found: number;
+        note?: string;
+    } | null;
+    fallback_tier: number;
+    fallback_note: string | null;
+    error: string | null;
+}
+
+interface OrchestrationData {
+    is_emergency: boolean;
+    overall_urgency: string;
+    routed_issues: RoutedIssue[];
+    issues?: ClinicalIssue[]; // Added for CLARIFY state
+    suggested_action: string;
+    combined_visit_possible: boolean;
+    patient_sentiment: string;
+    clarification_questions: string[];
+    emergency_slots?: Record<string, unknown>;
+    message?: string;
 }
 
 interface SlotData {
-    type: string;
     date: string;
     time: string;
     end_time: string;
-    time_block: number;
-    duration_minutes: number;
-    doctor_id: string;
     doctor_name: string;
-    room_id: string;
+    doctor_id: string;
     room_name: string;
-    clinic_id: string;
-    staff_id?: string;
-    staff_name?: string;
+    clinic_name: string;
     procedure: string;
-    consult_end_time?: string;
-    treatment_start_time?: string;
+    type: string;
+    duration_minutes: number;
     score: number;
 }
 
-interface TriageData {
-    procedure_name: string;
-    specialist_type: string;
-    treatment_minutes: number;
-    consult_minutes: number;
-    requires_sedation: boolean;
-    room_capability: boolean;
-    procedure_id: number;
+
+interface MissingField {
+    field_key: string;
+    label: string;
+    type: "text" | "select" | "slider" | "boolean";
+    required: boolean;
+    options?: string[];
+    min?: number;
+    max?: number;
 }
 
-type FlowStep = "WELCOME" | "TRIAGE" | "SLOTS" | "CONFIRM" | "DONE";
+interface ClarifyIssue {
+    issue_id: string;
+    summary: string;
+    missing_fields: MissingField[];
+}
 
-const containerVariants: Variants = {
-    hidden: { opacity: 0 },
-    visible: {
-        opacity: 1,
-        transition: { staggerChildren: 0.1 },
-    },
+type IntakePhase = "INPUT" | "CLARIFY" | "RESULTS" | "SLOTS" | "CONFIRM" | "BOOKED";
+
+// ── Constants ────────────────────────────────────────────────────────────────
+
+const DURATION_OPTIONS = [
+    { value: "less than 24 hours", label: "Less than 24 hours" },
+    { value: "1-3 days", label: "1–3 days" },
+    { value: "4-7 days", label: "4–7 days" },
+    { value: "1-2 weeks", label: "1–2 weeks" },
+    { value: "more than 2 weeks", label: "More than 2 weeks" },
+];
+
+const STEP_MAP: Record<IntakePhase, { step: number; label: string }> = {
+    INPUT: { step: 1, label: "Describe Concern" },
+    CLARIFY: { step: 2, label: "Clinical Clarification" },
+    RESULTS: { step: 3, label: "Specialist Routing" },
+    SLOTS: { step: 3, label: "Appointment Selection" },
+    CONFIRM: { step: 3, label: "Confirm Appointment" },
+    BOOKED: { step: 3, label: "Complete" },
 };
 
-const messageVariants: Variants = {
-    hidden: { opacity: 0, y: 10, scale: 0.95 },
-    visible: {
-        opacity: 1,
-        y: 0,
-        scale: 1,
-        transition: { duration: 0.3, ease: [0.4, 0, 0.2, 1] },
-    },
-};
+const MAX_CHARS = 1000;
 
-import { useAuth } from "@/context/AuthContext";
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
-// ... (imports remain the same, just adding useAuth)
+function urgencyColor(u: string): string {
+    switch (u.toUpperCase()) {
+        case "EMERGENCY": case "HIGH": return "var(--clinical-urgent)";
+        case "MEDIUM": return "var(--clinical-warning)";
+        case "LOW": return "var(--clinical-safe)";
+        default: return "var(--clinical-info)";
+    }
+}
 
-export default function ChatPage() {
-    const router = useRouter();
-    const { user, isLoading: authLoading } = useAuth();
-    const messagesEndRef = useRef<HTMLDivElement>(null);
-    const [messages, setMessages] = useState<Message[]>([]);
-    const [input, setInput] = useState("");
-    const [step, setStep] = useState<FlowStep>("WELCOME");
+function urgencyLabel(u: string): string {
+    switch (u.toUpperCase()) {
+        case "EMERGENCY": return "Immediate Clinical Attention Required";
+        case "HIGH": return "High Priority";
+        case "MEDIUM": return "Medium Priority";
+        case "LOW": return "Routine";
+        default: return u;
+    }
+}
+
+// Map backend duration days to frontend dropdown
+function mapDurationToOption(days?: number): string {
+    if (days === undefined || days === null) return "";
+    if (days < 1) return "less than 24 hours";
+    if (days <= 3) return "1-3 days";
+    if (days <= 7) return "4-7 days";
+    if (days <= 14) return "1-2 weeks";
+    return "more than 2 weeks";
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+
+export default function ClinicalIntakePage() {
+    const { user } = useAuth();
+    const role = (user?.role as "patient" | "admin") || "patient";
+
+    const [phase, setPhase] = useState<IntakePhase>("INPUT");
+    const [symptomText, setSymptomText] = useState("");
     const [loading, setLoading] = useState(false);
-    const [patientId, setPatientId] = useState<string | null>(null);
-    const [patientName, setPatientName] = useState("");
-    const [triageData, setTriageData] = useState<TriageData | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [orchestration, setOrchestration] = useState<OrchestrationData | null>(null);
+    const [systemMessage, setSystemMessage] = useState<string | null>(null);
+    const [clarificationQuestions, setClarificationQuestions] = useState<string[]>([]);
+    const [clarificationAnswers, setClarificationAnswers] = useState<Record<string, string>>({});
+    const [painSeverity, setPainSeverity] = useState(5);
+    const [duration, setDuration] = useState("");
+    const [breathingDifficulty, setBreathingDifficulty] = useState<boolean | null>(null);
+    const [locationInput, setLocationInput] = useState("");
+    const [conversationContext, setConversationContext] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
+    const [slots, setSlots] = useState<SlotData[]>([]);
     const [selectedSlot, setSelectedSlot] = useState<SlotData | null>(null);
-    const [clarificationCount, setClarificationCount] = useState(0);
+    const [bookingNotes, setBookingNotes] = useState("");
+    const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+
+    // Extracted issues for smart dynamic form
+    const [parsedIssues, setParsedIssues] = useState<ClinicalIssue[]>([]);
+    const [clarificationIssues, setClarificationIssues] = useState<ClarifyIssue[] | null>(null);
+
+    const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (authLoading) return;
+        if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }, [phase, orchestration, slots]);
 
-        if (!user || user.role !== "patient") {
-            // AuthContext handles redirect
+    const updateTimestamp = () => {
+        setLastUpdated(new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }));
+    };
+
+    // ── Submit Initial Symptoms ──────────────────────────────────────────────
+    const handleAnalyze = async () => {
+        if (!symptomText.trim() || loading) return;
+        setLoading(true);
+        setError(null);
+        setSystemMessage(null);
+
+        const userEntry = { role: "user" as const, content: symptomText };
+        const newContext = [...conversationContext, userEntry];
+        setConversationContext(newContext);
+
+        try {
+            const res = await analyzeSymptoms(symptomText, newContext);
+            const action = res.suggested_action || res.action || "CLARIFY";
+            const assistantEntry = { role: "assistant" as const, content: res.message || "" };
+            setConversationContext([...newContext, assistantEntry]);
+            updateTimestamp();
+
+            if (action === "ESCALATE") {
+                setOrchestration(res);
+                setSystemMessage(res.message);
+                setPhase("RESULTS");
+                if (res.emergency_slot) {
+                    setSelectedSlot(res.emergency_slot as unknown as SlotData);
+                    setPhase("CONFIRM");
+                }
+            } else if (action === "GREETING" || action === "SMALL_TALK" || action === "GREET") {
+                setSystemMessage(res.message);
+            } else if (action === "CLARIFY") {
+                // Enterprise UX: Smart Prefill & Dynamic Form
+                const issues = res.issues || [];
+                setParsedIssues(issues);
+
+                // Phase 2: Dynamic Clarification Interface
+                if (res.clarification && res.clarification.issues) {
+                    setClarificationIssues(res.clarification.issues);
+                } else {
+                    setClarificationIssues(null);
+                }
+
+                // Legacy Prefill (Keep for now, but UI will prefer Dynamic Panel)
+                const primary = issues[0];
+                if (primary) {
+                    if (primary.severity) setPainSeverity(primary.severity);
+                    if (primary.location) setLocationInput(primary.location);
+                    if (primary.duration_days !== undefined && primary.duration_days !== null) {
+                        setDuration(mapDurationToOption(primary.duration_days));
+                    }
+                    if (primary.airway_compromise) setBreathingDifficulty(true);
+                }
+
+                setClarificationQuestions(res.clarification_questions || []);
+                setSystemMessage(res.message);
+                setPhase("CLARIFY");
+            } else if (action === "ORCHESTRATE") {
+                setOrchestration(res);
+                setSystemMessage(res.message);
+                setPhase("RESULTS");
+                await searchSlotsForIssues(res);
+            } else {
+                setSystemMessage(res.message || "Please provide more detail about your concern.");
+            }
+        } catch {
+            setError("We were unable to process the information provided. Please refine your description with more clinical details such as location, duration, and severity.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // ── Submit Clarification ─────────────────────────────────────────────────
+    const handleClarificationSubmit = async (dynamicData?: Record<string, any>) => {
+        if (loading) return;
+        setLoading(true);
+        setError(null);
+
+        let responseText = "";
+
+        if (dynamicData && clarificationIssues) {
+            // Enterprise UX: Convert structured form data to natural language for the LLM
+            const parts: string[] = [];
+            clarificationIssues.forEach(issue => {
+                issue.missing_fields.forEach(field => {
+                    const key = `${issue.issue_id}_${field.field_key}`;
+                    const val = dynamicData[key];
+                    if (val !== undefined && val !== null && val !== "") {
+                        if (field.type === "boolean") {
+                            parts.push(`${field.label}: ${val ? "Yes" : "No"}`);
+                        } else {
+                            parts.push(`${field.label}: ${val}`);
+                        }
+                    }
+                });
+            });
+            responseText = parts.join(". ");
+        } else {
+            // Fallback to text input
+            responseText = symptomText;
+        }
+
+        if (!responseText.trim()) {
+            setLoading(false);
             return;
         }
 
-        const pId = user.user_id;
-        const pName = user.patient_name || "Patient";
-        setPatientId(pId);
-        setPatientName(pName);
+        const userEntry = { role: "user" as const, content: responseText };
+        const newContext = [...conversationContext, userEntry];
+        setConversationContext(newContext);
+        setSymptomText(""); // Clear input
 
-        if (messages.length === 0) {
-            setMessages([
-                {
-                    role: "assistant",
-                    content: `Hello${pName ? ", " + pName : ""}! I'm your SmartDental AI assistant. I can help you book the right dental appointment.`,
-                },
-            ]);
-            setStep("TRIAGE");
-        }
-    }, [user, authLoading]);
-
-    useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages, loading]);
-
-    const addMsg = (msg: Message) => setMessages((prev) => [...prev, msg]);
-
-    const handleSend = async () => {
-        if (!input.trim() || loading) return;
-        const text = input.trim();
-        setInput("");
-        addMsg({ role: "user", content: text });
-
-        if (step === "TRIAGE") {
-            await handleTriage(text, messages);
-        }
-    };
-
-    const handleTriage = async (text: string, history: Message[]) => {
-        setLoading(true);
         try {
-            const res = await analyzeSymptoms(text, history);
-            const action = res.action || "ROUTE";
-            const intent = res.intent || {};
+            const res = await analyzeSymptoms(responseText, newContext);
+            const action = res.suggested_action || res.action || "CLARIFY";
+            const assistantEntry = { role: "assistant" as const, content: res.message || "" };
+            setConversationContext([...newContext, assistantEntry]);
+            updateTimestamp();
 
-            if (action === "GREET") {
-                addMsg({ role: "assistant", content: res.message });
-                setClarificationCount(0);
-                return;
-            }
-
-            if (action === "CLARIFY") {
-                const count = clarificationCount + 1;
-                setClarificationCount(count);
-                let msg = res.message;
-                if (count >= 3) {
-                    msg +=
-                        "\n\n**Tip:** Try describing location, pain type, duration, and visible issues.";
-                }
-                addMsg({ role: "assistant", content: msg });
-                return;
-            }
-
-            if (action === "EMERGENCY") {
-                setTriageData(res.triage);
-                addMsg({
-                    role: "assistant",
-                    content: res.message,
-                    emergency: true,
-                    emergencySlot: res.emergency_slot,
-                });
+            if (action === "ESCALATE") {
+                setOrchestration(res);
+                setSystemMessage(res.message);
+                setPhase("RESULTS");
                 if (res.emergency_slot) {
                     setSelectedSlot(res.emergency_slot as unknown as SlotData);
-                    setStep("CONFIRM");
+                    setPhase("CONFIRM");
                 }
-                setClarificationCount(0);
-                return;
+            } else if (action === "GREETING" || action === "SMALL_TALK" || action === "GREET") {
+                setSystemMessage(res.message);
+            } else if (action === "CLARIFY") {
+                const issues = res.issues || [];
+                setParsedIssues(issues);
+
+                if (res.clarification && res.clarification.issues) {
+                    setClarificationIssues(res.clarification.issues);
+                } else {
+                    setClarificationIssues(null);
+                }
+
+                setClarificationQuestions(res.clarification_questions || []);
+                setSystemMessage(res.message);
+                setPhase("CLARIFY");
+            } else if (action === "ORCHESTRATE") {
+                setOrchestration(res);
+                setSystemMessage(res.message);
+                setPhase("RESULTS");
+                await searchSlotsForIssues(res);
+            } else {
+                setSystemMessage(res.message || "Please provide more detail about your concern.");
             }
-
-            if (!res.triage) {
-                addMsg({
-                    role: "assistant",
-                    content:
-                        res.message ||
-                        "I couldn't find a matching procedure. Could you provide additional details?",
-                });
-                return;
-            }
-
-            const triage: TriageData = res.triage;
-            setTriageData(triage);
-            setClarificationCount(0);
-
-            addMsg({
-                role: "assistant",
-                content: `**Analysis Complete**\n\nI've identified your needs. Searching for available slots...`,
-                triage: triage,
-            });
-
-            const slotsRes = await searchSlots(
-                triage.procedure_id,
-                triage.requires_sedation
-            );
-            const allSlots = [
-                ...(slotsRes.combo_slots || []),
-                ...(slotsRes.single_slots || []),
-            ];
-
-            if (allSlots.length === 0) {
-                addMsg({
-                    role: "assistant",
-                    content: `${slotsRes.note || "No available slots found."}\n\nPlease contact the clinic directly.`,
-                });
-                return;
-            }
-
-            addMsg({
-                role: "assistant",
-                content: `I found **${allSlots.length}** available slots. Please select one from the panel on the right.`,
-                slots: allSlots,
-            });
-            setStep("SLOTS");
-        } catch (err: unknown) {
-            addMsg({
-                role: "assistant",
-                content: `Sorry, I encountered an error. Please try again.`,
-            });
+        } catch {
+            setError("We were unable to process your response. Please try again.");
         } finally {
             setLoading(false);
         }
     };
 
-    const handleSelectSlot = (slot: SlotData) => {
-        setSelectedSlot(slot);
-        setStep("CONFIRM");
-        addMsg({
-            role: "assistant",
-            content: `Perfect! I've selected **${slot.doctor_name}** on ${slot.date} at ${slot.time}. Please review the details and confirm your booking.`,
+    // ── Slot Search (uses pre-attached slots from orchestration) ───────────────
+    const searchSlotsForIssues = async (orch: OrchestrationData) => {
+        if (!orch.routed_issues?.length) return;
+
+        // Collect slots from all routed issues (pre-attached by orchestration engine)
+        const allSlots: SlotData[] = [];
+        for (const issue of orch.routed_issues) {
+            if (issue.slots) {
+                allSlots.push(...(issue.slots.combo_slots || []), ...(issue.slots.single_slots || []));
+            }
+        }
+
+        if (allSlots.length > 0) {
+            setSlots(allSlots);
+            setPhase("SLOTS");
+            return;
+        }
+
+        // Fallback: if orchestration didn't attach slots, search by specialist
+        const primaryIssue = orch.routed_issues.reduce((prev, curr) => {
+            const m: Record<string, number> = { EMERGENCY: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+            return (m[curr.urgency] || 1) > (m[prev.urgency] || 1) ? curr : prev;
         });
+        try {
+            const slotRes = await searchSlotsBySpecialist(primaryIssue.specialist_type, primaryIssue.requires_sedation);
+            const fallbackSlots = [...(slotRes.combo_slots || []), ...(slotRes.single_slots || [])];
+            if (fallbackSlots.length > 0) {
+                setSlots(fallbackSlots);
+                setPhase("SLOTS");
+            }
+        } catch { /* slot search failed silently */ }
     };
 
-    const handleConfirm = async () => {
-        if (!selectedSlot || !patientId || !triageData) return;
+    // ── Derived State ────────────────────────────────────────────────────────
+    const isEmergency = orchestration?.is_emergency || breathingDifficulty === true;
+    const triageStatus = orchestration
+        ? (isEmergency
+            ? "Urgent Triage"
+            : (orchestration.routed_issues.some(i => i.procedure_id != null) ? "Specialist Evaluation Identified" : "Review Required"))
+        : "Pending";
+    const bookingBlocked = isEmergency || triageStatus === "Pending";
+
+    // ── Booking ──────────────────────────────────────────────────────────────────────
+    const handleConfirmBooking = async () => {
+        if (!selectedSlot || loading || bookingBlocked) return;
         setLoading(true);
+        setError(null);
+
+        // Resolve procedure_id from the primary routed issue
+        const primaryIssue = orchestration?.routed_issues?.find(r => r.procedure_id != null);
+        const procId = primaryIssue?.procedure_id ?? null;
+
         try {
-            const res = await bookAppointment(
-                patientId,
-                triageData.procedure_id,
-                selectedSlot as unknown as Record<string, unknown>
-            );
-            addMsg({
-                role: "assistant",
-                content: `**Appointment Confirmed!**\n\nYour booking is confirmed. You can view all details in your appointments.`,
-                booked: true,
-            });
-            setStep("DONE");
+            await bookAppointment(user?.user_id || "", procId as unknown as number, { ...selectedSlot, notes: bookingNotes || symptomText });
+            setPhase("BOOKED");
+            updateTimestamp();
         } catch {
-            addMsg({
-                role: "assistant",
-                content: `Booking failed. Please try again.`,
-            });
+            setError(
+                isEmergency
+                    ? "Booking paused due to emergency triage. Please contact the clinic directly."
+                    : "We were unable to complete the booking due to a system error. Please try again or contact the clinic."
+            );
         } finally {
             setLoading(false);
         }
     };
 
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            handleSend();
-        }
-    };
-
-    const formatDate = (dateStr: string) => {
-        try {
-            const date = new Date(dateStr);
-            return date.toLocaleDateString("en-US", {
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-            });
-        } catch {
-            return dateStr;
-        }
-    };
-
-    const resetBooking = () => {
-        setMessages([
-            {
-                role: "assistant",
-                content: "Ready for another booking! Describe your dental concern.",
-            },
-        ]);
-        setTriageData(null);
+    const handleNewIntake = () => {
+        setPhase("INPUT");
+        setSymptomText("");
+        setOrchestration(null);
+        setSystemMessage(null);
+        setClarificationQuestions([]);
+        setClarificationAnswers({});
+        setPainSeverity(5);
+        setDuration("");
+        setBreathingDifficulty(null);
+        setLocationInput("");
+        setConversationContext([]);
+        setSlots([]);
         setSelectedSlot(null);
-        setClarificationCount(0);
-        setStep("TRIAGE");
+        setBookingNotes("");
+        setError(null);
+        setLastUpdated(null);
     };
 
-    // Get latest slots from messages (search from end to find most recent)
-    const latestSlots = [...messages].reverse().find((m) => m.slots)?.slots || [];
-    const isEmergency = messages.some((m) => m.emergency);
-    const emergencySlot = [...messages].reverse().find((m) => m.emergencySlot)?.emergencySlot as SlotData | undefined;
+    const currentStep = STEP_MAP[phase];
+    const charCount = symptomText.length;
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // RENDER
+    // ══════════════════════════════════════════════════════════════════════════
 
     return (
-        <DashboardLayout
-            role="patient"
-            title="Medical Triage"
-            subtitle="Secure AI-driven clinical assessment and scheduling"
-        >
-            <div className="grid h-[calc(100vh-8rem)] grid-cols-1 gap-6 lg:grid-cols-12">
-                {/* Left: Chat Interface */}
-                <div className="flex flex-col lg:col-span-7 h-full min-h-[500px]">
-                    <div className="flex flex-col flex-1 overflow-hidden rounded-xl border border-brand-default bg-brand-card">
-                        {/* Messages Area */}
-                        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-                            <motion.div
-                                variants={containerVariants}
-                                initial="hidden"
-                                animate="visible"
-                                className="space-y-6"
-                            >
-                                {messages.map((msg, i) => (
-                                    <motion.div
-                                        key={i}
-                                        variants={messageVariants}
-                                        className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"
-                                            }`}
-                                    >
-                                        <div
-                                            className={`max-w-[70%] rounded-xl px-5 py-3.5 ${msg.role === "user"
-                                                ? "bg-indigo-600 text-brand-text-primary rounded-tr-none"
-                                                : "border border-brand-default bg-brand-secondary text-brand-text-secondary rounded-tl-none"
-                                                }`}
-                                        >
-                                            <div className="whitespace-pre-wrap text-sm font-medium leading-relaxed">
-                                                {msg.content.split(/(\*\*.*?\*\*)/).map((part, j) =>
-                                                    part.startsWith("**") && part.endsWith("**") ? (
-                                                        <span key={j} className="font-bold text-brand-text-primary">
-                                                            {part.slice(2, -2)}
-                                                        </span>
-                                                    ) : (
-                                                        part
-                                                    )
-                                                )}
-                                            </div>
-                                        </div>
-                                    </motion.div>
-                                ))}
-
-                                {loading && (
-                                    <motion.div
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        className="flex justify-start"
-                                    >
-                                        <div className="flex items-center gap-2 rounded-xl border border-brand-subtle bg-brand-secondary/40 px-6 py-3 backdrop-blur-sm">
-                                            <div className="flex gap-1.5">
-                                                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-brand-accent [animation-delay:-0.3s]" />
-                                                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-brand-accent [animation-delay:-0.15s]" />
-                                                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-brand-accent" />
-                                            </div>
-                                        </div>
-                                    </motion.div>
-                                )}
-                                <div ref={messagesEndRef} />
-                            </motion.div>
-                        </div>
-
-                        {/* Input Area */}
-                        <div className="border-t border-brand-default bg-brand-secondary p-6">
-                            {step === "DONE" ? (
-                                <div className="flex h-full items-center gap-4">
-                                    <button
-                                        onClick={() => router.push("/patient/appointments")}
-                                        className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-brand-default bg-brand-card py-3.5 text-[10px] font-bold uppercase tracking-widest text-brand-text-primary transition-all hover:bg-brand-elevated"
-                                    >
-                                        <Calendar size={16} />
-                                        Records
-                                    </button>
-                                    <button
-                                        onClick={resetBooking}
-                                        className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-indigo-600 py-3.5 text-[10px] font-bold uppercase tracking-widest text-brand-text-primary transition-all hover:bg-indigo-500"
-                                    >
-                                        <RotateCcw size={16} />
-                                        New Booking
-                                    </button>
-                                </div>
-                            ) : step === "CONFIRM" ? (
-                                <div className="flex h-full items-center gap-4">
-                                    <button
-                                        onClick={() => {
-                                            setSelectedSlot(null);
-                                            setStep("SLOTS");
-                                        }}
-                                        className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-brand-default bg-brand-card py-3.5 text-[10px] font-bold uppercase tracking-widest text-brand-text-primary transition-all hover:bg-brand-elevated"
-                                    >
-                                        <X size={16} />
-                                        Adjust Slot
-                                    </button>
-                                    <button
-                                        onClick={handleConfirm}
-                                        disabled={loading}
-                                        className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-600 py-3.5 text-[10px] font-bold uppercase tracking-widest text-brand-text-primary transition-all hover:bg-emerald-500 disabled:opacity-50"
-                                    >
-                                        <CheckCircle2 size={16} />
-                                        Authorize Booking
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="relative">
-                                    <input
-                                        type="text"
-                                        value={input}
-                                        onChange={(e) => setInput(e.target.value)}
-                                        onKeyDown={handleKeyDown}
-                                        disabled={loading || step === "SLOTS"}
-                                        placeholder={
-                                            step === "TRIAGE"
-                                                ? "How can we help today?"
-                                                : "Select a slot above..."
-                                        }
-                                        className="w-full rounded-lg border border-brand-default bg-brand-card py-4 pl-6 pr-16 text-sm text-brand-text-primary placeholder-brand-text-disabled outline-none transition-all focus:border-indigo-500/50 disabled:opacity-50"
-                                    />
-                                    <button
-                                        onClick={handleSend}
-                                        disabled={loading || !input.trim() || step === "SLOTS"}
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600 text-brand-text-primary transition-all hover:bg-indigo-500 disabled:opacity-20"
-                                    >
-                                        <Send size={18} />
-                                    </button>
-                                </div>
+        <DashboardLayout role={role} title="Clinical Intake" subtitle="Constraint-Aware Clinical Routing System">
+            <div style={{ maxWidth: "1120px", margin: "0 auto", padding: "24px 0" }}>
+                {/* ── Step Progress ─────────────────────────────────── */}
+                <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "16px",
+                    marginBottom: "24px",
+                    padding: "0 4px",
+                }}>
+                    {[
+                        { n: 1, label: "Describe Concern" },
+                        { n: 2, label: "Clinical Clarification" },
+                        { n: 3, label: "Specialist Routing" },
+                    ].map((s, i) => (
+                        <div key={s.n} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            {i > 0 && (
+                                <div style={{
+                                    width: "32px",
+                                    height: "1px",
+                                    background: currentStep.step > i ? "var(--accent-primary)" : "var(--border-primary)",
+                                }} />
                             )}
+                            <div style={{
+                                width: "24px",
+                                height: "24px",
+                                borderRadius: "50%",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: "0.6875rem",
+                                fontWeight: 600,
+                                background: currentStep.step >= s.n ? "var(--accent-primary)" : "var(--bg-elevated)",
+                                color: currentStep.step >= s.n ? "#fff" : "var(--text-muted)",
+                                transition: "all var(--transition-base)",
+                                flexShrink: 0,
+                            }}>
+                                {currentStep.step > s.n ? (
+                                    <CheckCircle2 size={13} />
+                                ) : s.n}
+                            </div>
+                            <span style={{
+                                fontSize: "0.8125rem",
+                                color: currentStep.step >= s.n ? "var(--text-primary)" : "var(--text-muted)",
+                                fontWeight: currentStep.step === s.n ? 500 : 400,
+                                whiteSpace: "nowrap",
+                            }}>
+                                {s.label}
+                            </span>
                         </div>
-                    </div>
+                    ))}
                 </div>
 
-                {/* Right: Live Summary & Slots Panel */}
-                <div className="flex flex-col gap-6 lg:col-span-5">
-                    {/* Live Appointment Summary Card */}
-                    <div className="rounded-xl border border-brand-default bg-brand-card p-6">
-                        <div className="mb-6 flex items-center justify-between">
-                            <h3 className="text-[10px] font-bold uppercase tracking-widest text-brand-text-muted">
-                                Case Summary
-                            </h3>
-                            {isEmergency && (
-                                <span className="flex items-center gap-1.5 rounded-lg bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-rose-400">
-                                    <AlertCircle size={12} />
-                                    Emergency
-                                </span>
-                            )}
-                        </div>
-
-                        {triageData ? (
-                            <div className="space-y-6">
-                                <div className="flex items-start gap-4">
-                                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 border border-indigo-500/20">
-                                        <Stethoscope size={24} className="text-indigo-400" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-[10px] font-bold uppercase tracking-widest text-brand-text-disabled">Procedure</p>
-                                        <p className="text-base font-bold text-brand-text-primary mt-0.5 leading-tight">
-                                            {triageData.procedure_name}
-                                        </p>
-                                        <p className="text-[10px] font-bold text-indigo-400 mt-1 uppercase tracking-widest">
-                                            {triageData.specialist_type}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-secondary border border-brand-default">
-                                            <Clock size={16} className="text-brand-text-muted" />
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] font-bold uppercase tracking-widest text-brand-text-disabled">Time</p>
-                                            <p className="text-xs font-bold text-brand-text-primary mt-0.5">
-                                                {triageData.treatment_minutes}m
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    {triageData.requires_sedation && (
-                                        <div className="flex items-center gap-3">
-                                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10 border border-amber-500/20">
-                                                <Shield size={16} className="text-amber-400" />
-                                            </div>
-                                            <div>
-                                                <p className="text-[10px] font-bold uppercase tracking-widest text-brand-text-disabled">Type</p>
-                                                <p className="text-xs font-bold text-amber-400 mt-0.5">Sedation</p>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {selectedSlot && (
-                                    <div className="mt-6 rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-5">
-                                        <p className="mb-4 text-[10px] font-bold uppercase tracking-widest text-indigo-400">
-                                            Selected Appointment
-                                        </p>
-                                        <div className="space-y-3">
-                                            <div className="flex items-center gap-3 text-xs font-bold text-brand-text-primary">
-                                                <Calendar size={14} className="text-indigo-400" />
-                                                {formatDate(selectedSlot.date)} • {selectedSlot.time}
-                                            </div>
-                                            <div className="flex items-center gap-3 text-xs font-semibold text-brand-text-secondary">
-                                                <User size={14} className="text-brand-text-disabled" />
-                                                {selectedSlot.doctor_name}
-                                            </div>
-                                            <div className="flex items-center gap-3 text-xs font-semibold text-brand-text-secondary">
-                                                <MapPin size={14} className="text-brand-text-disabled" />
-                                                {selectedSlot.room_name}
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center py-10 text-center">
-                                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-brand-secondary border border-brand-default">
-                                    <Sparkles size={24} className="text-brand-text-disabled" />
-                                </div>
-                                <p className="text-xs font-medium text-brand-text-disabled max-w-[180px] leading-relaxed">
-                                    Start chatting to build your assessment summary
+                {/* ── Main Grid ─────────────────────────────────────── */}
+                <div style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 300px",
+                    gap: "20px",
+                    alignItems: "start",
+                }}>
+                    {/* LEFT COLUMN */}
+                    <div
+                        ref={scrollRef}
+                        style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "16px",
+                            maxHeight: "calc(100vh - 200px)",
+                            overflowY: "auto",
+                            paddingRight: "4px",
+                        }}
+                        className="custom-scrollbar"
+                    >
+                        {/* Error Banner */}
+                        {error && (
+                            <div style={{
+                                borderLeft: "3px solid var(--clinical-urgent)",
+                                padding: "14px 16px",
+                                borderRadius: "var(--radius-md)",
+                                background: "var(--bg-card)",
+                                border: "1px solid var(--border-primary)",
+                                borderLeftWidth: "3px",
+                                borderLeftColor: "var(--clinical-urgent)",
+                            }}>
+                                <p style={{ color: "var(--text-secondary)", fontSize: "0.8125rem", margin: 0, lineHeight: 1.6 }}>
+                                    {error}
                                 </p>
                             </div>
                         )}
-                    </div>
 
-                    {/* Available Slots Panel */}
-                    {(latestSlots.length > 0 || emergencySlot) && (
-                        <div className="flex flex-col flex-1 overflow-hidden rounded-xl border border-brand-default bg-brand-card">
-                            <div className="border-b border-brand-default bg-brand-secondary p-5">
-                                <h3 className="text-[10px] font-bold uppercase tracking-widest text-brand-text-muted">
-                                    Available Slots
-                                </h3>
-                                <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-indigo-400">
-                                    {(latestSlots.length + (emergencySlot ? 1 : 0))} Options Found
-                                </p>
+                        {/* ── SECTION 1: Symptom Input ─────────────────── */}
+                        <Section title="Describe Your Concern">
+                            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                                {/* Guidance */}
+                                {phase === "INPUT" && (
+                                    <div style={{
+                                        fontSize: "0.8125rem",
+                                        color: "var(--text-muted)",
+                                        lineHeight: 1.7,
+                                        paddingBottom: "8px",
+                                        borderBottom: "1px solid var(--border-primary)",
+                                    }}>
+                                        Please include the following in your description:
+                                        <div style={{ marginTop: "6px", paddingLeft: "4px" }}>
+                                            <div>· Location (upper/lower, left/right)</div>
+                                            <div>· Duration (how long have you experienced this?)</div>
+                                            <div>· Severity (1–10 scale)</div>
+                                            <div>· Associated symptoms (swelling, bleeding, fever)</div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div style={{ position: "relative" }}>
+                                    <textarea
+                                        value={symptomText}
+                                        onChange={(e) => {
+                                            if (e.target.value.length <= MAX_CHARS) setSymptomText(e.target.value);
+                                        }}
+                                        placeholder={"Example: \"I've had sharp pain in my lower left molar for 3 days.\nIt worsens at night and is sensitive to cold. No swelling.\""}
+                                        disabled={loading || (phase !== "INPUT" && phase !== "CLARIFY")}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter" && !e.shiftKey && phase === "INPUT") {
+                                                e.preventDefault();
+                                                handleAnalyze();
+                                            }
+                                        }}
+                                        style={{
+                                            width: "100%",
+                                            minHeight: "100px",
+                                            resize: "vertical",
+                                            padding: "12px",
+                                            paddingBottom: "28px",
+                                            fontSize: "0.875rem",
+                                            lineHeight: 1.6,
+                                            background: "var(--bg-input)",
+                                            border: "1px solid var(--border-primary)",
+                                            borderRadius: "var(--radius-md)",
+                                            color: "var(--text-primary)",
+                                            fontFamily: "inherit",
+                                        }}
+                                    />
+                                    <span style={{
+                                        position: "absolute",
+                                        bottom: "8px",
+                                        right: "12px",
+                                        fontSize: "0.6875rem",
+                                        color: charCount > MAX_CHARS * 0.9 ? "var(--clinical-warning)" : "var(--text-disabled)",
+                                    }}>
+                                        {charCount}/{MAX_CHARS}
+                                    </span>
+                                </div>
+
+                                {phase === "INPUT" && (
+                                    <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                                        <button
+                                            onClick={handleAnalyze}
+                                            disabled={!symptomText.trim() || loading}
+                                            style={{
+                                                padding: "10px 24px",
+                                                background: (!symptomText.trim() || loading) ? "var(--bg-elevated)" : "var(--accent-primary)",
+                                                color: "#fff",
+                                                border: "none",
+                                                borderRadius: "var(--radius-md)",
+                                                fontSize: "0.8125rem",
+                                                fontWeight: 500,
+                                                cursor: (!symptomText.trim() || loading) ? "not-allowed" : "pointer",
+                                                opacity: (!symptomText.trim() || loading) ? 0.5 : 1,
+                                                transition: "background var(--transition-fast)",
+                                            }}
+                                        >
+                                            {loading ? "Processing..." : "Begin Clinical Review"}
+                                        </button>
+                                        <span style={{ fontSize: "0.75rem", color: "var(--text-disabled)" }}>
+                                            Does not constitute medical advice
+                                        </span>
+                                    </div>
+                                )}
                             </div>
+                        </Section>
 
-                            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                                <div className="space-y-4">
-                                    {/* Helper function to confirm selection */}
-                                    {emergencySlot && (
-                                        <button
-                                            onClick={() => handleSelectSlot(emergencySlot)}
-                                            disabled={step === "CONFIRM" && selectedSlot !== emergencySlot}
-                                            className={`group w-full rounded-xl border p-5 text-left transition-all relative overflow-hidden ${selectedSlot === emergencySlot
-                                                ? "border-rose-500 bg-rose-500/10"
-                                                : "border-rose-500/30 bg-rose-500/5 hover:border-rose-500/50"
-                                                }`}
-                                        >
-                                            <div className="absolute right-0 top-0 rounded-bl-xl bg-rose-500 px-3 py-1 text-[8px] font-bold uppercase tracking-widest text-white">
-                                                Priority Slot
-                                            </div>
-                                            <div className="relative z-10 flex items-start justify-between">
-                                                <div>
-                                                    <div className="flex items-center gap-2">
-                                                        <p className="text-sm font-bold text-brand-text-primary tracking-tight">
-                                                            {emergencySlot.doctor_name}
-                                                        </p>
-                                                    </div>
-                                                    <div className="mt-2 flex items-center gap-4 text-xs font-medium text-brand-text-secondary">
-                                                        <span className="flex items-center gap-1.5 text-rose-400">
-                                                            <Clock size={14} />
-                                                            {emergencySlot.time} (Immediate)
+                        {/* System Message */}
+                        {systemMessage && phase === "INPUT" && (
+                            <Section title="System Response">
+                                <p style={{ color: "var(--text-secondary)", fontSize: "0.8125rem", margin: 0, lineHeight: 1.7 }}>
+                                    {systemMessage}
+                                </p>
+                            </Section>
+                        )}
+
+                        {/* ── SECTION 2: Reported Concerns ─────────────── */}
+                        <AnimatePresence>
+                            {orchestration && orchestration.routed_issues.length > 0 && phase !== "INPUT" && (
+                                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15 }}>
+                                    <Section title="Identified Concerns">
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                                            {orchestration.routed_issues.map((issue, i) => (
+                                                <div key={i} style={{
+                                                    borderLeft: `3px solid ${urgencyColor(issue.urgency)}`,
+                                                    padding: "12px 16px",
+                                                    background: "var(--bg-input)",
+                                                    borderRadius: "var(--radius-md)",
+                                                }}>
+                                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                                                        <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--text-primary)" }}>
+                                                            Concern {i + 1} — {issue.description}
                                                         </span>
-                                                        <span className="flex items-center gap-1.5">
-                                                            <MapPin size={14} />
-                                                            {emergencySlot.room_name}
+                                                        <span style={{
+                                                            fontSize: "0.6875rem",
+                                                            fontWeight: 500,
+                                                            textTransform: "uppercase",
+                                                            letterSpacing: "0.04em",
+                                                            color: urgencyColor(issue.urgency),
+                                                        }}>
+                                                            {urgencyLabel(issue.urgency)}
                                                         </span>
                                                     </div>
+                                                    <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                                                        Specialist: {issue.specialist_type}
+                                                        {issue.requires_sedation && " · Sedation available"}
+                                                    </span>
+                                                    {/* Reasoning Traceability Layer */}
+                                                    {issue.reasoning_triggers?.length > 0 && (
+                                                        <div style={{ marginTop: "10px", padding: "8px", background: "var(--bg-card)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-primary)" }}>
+                                                            <div style={{ fontSize: "0.6875rem", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", marginBottom: "4px" }}>
+                                                                Reason Traceability
+                                                            </div>
+                                                            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                                                                {issue.reasoning_triggers.map((t, ti) => (
+                                                                    <span key={ti} style={{ fontSize: "0.75rem", color: "var(--clinical-info)", display: "flex", alignItems: "center", gap: "4px" }}>
+                                                                        <CheckCircle2 size={10} /> {t}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-rose-500/20 bg-rose-500/10 text-rose-500 transition-colors group-hover:bg-rose-500 group-hover:text-white">
-                                                    <ChevronRight size={16} />
-                                                </div>
-                                            </div>
-                                        </button>
-                                    )}
+                                            ))}
+                                        </div>
+                                    </Section>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
 
-                                    {latestSlots.map((slot, idx) => (
-                                        <button
-                                            key={idx}
-                                            onClick={() => handleSelectSlot(slot)}
-                                            disabled={step === "CONFIRM" && selectedSlot !== slot}
-                                            className={`group w-full rounded-xl border p-5 text-left transition-all ${selectedSlot === slot
-                                                ? "border-indigo-500 bg-indigo-500/10"
-                                                : "border-brand-default bg-brand-secondary hover:border-brand-hover"
-                                                }`}
-                                        >
-                                            <div className="relative z-10 flex items-start justify-between">
-                                                <div>
-                                                    <div className="flex items-center gap-2">
-                                                        <p className="text-sm font-bold text-brand-text-primary tracking-tight">
-                                                            {slot.doctor_name}
-                                                        </p>
-                                                        {slot.type === "COMBO" && (
-                                                            <span className="flex items-center gap-1 rounded-lg bg-emerald-500/10 border border-emerald-500/10 px-2 py-0.5 text-[8px] font-bold uppercase tracking-widest text-emerald-400">
-                                                                <Sparkles size={10} />
-                                                                Combo
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    <p className="text-xs text-brand-text-muted mt-1">
-                                                        {slot.room_name}
-                                                        {slot.staff_name && ` • ${slot.staff_name}`}
-                                                    </p>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="font-semibold text-indigo-400">
-                                                        {slot.time}
-                                                    </p>
-                                                    <p className="text-xs text-brand-text-muted">
-                                                        {formatDate(slot.date)}
-                                                    </p>
-                                                </div>
-                                            </div>
-
-                                            <div className="mt-3 flex items-center justify-between border-t border-brand-default/50 pt-3">
-                                                <span className="text-xs text-brand-text-muted">
-                                                    {slot.duration_minutes} minutes
-                                                </span>
-                                                <ChevronRight
-                                                    size={16}
-                                                    className={`text-brand-text-disabled transition-transform group-hover:translate-x-1 ${selectedSlot === slot ? "text-indigo-400" : ""
-                                                        }`}
-                                                />
-                                            </div>
-                                        </button>
-                                    ))}
+                        {/* Emergency */}
+                        {isEmergency && phase !== "INPUT" && (
+                            <div style={{
+                                borderLeft: "3px solid var(--clinical-urgent)",
+                                padding: "16px 18px",
+                                borderRadius: "var(--radius-md)",
+                                background: "var(--bg-card)",
+                                border: "1px solid var(--border-primary)",
+                                borderLeftWidth: "3px",
+                                borderLeftColor: "var(--clinical-urgent)",
+                            }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                                    <AlertTriangle size={14} style={{ color: "var(--clinical-urgent)" }} />
+                                    <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--clinical-urgent)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                                        Immediate Clinical Attention Required
+                                    </span>
+                                </div>
+                                <p style={{ color: "var(--text-secondary)", fontSize: "0.8125rem", margin: "0 0 10px 0", lineHeight: 1.6 }}>
+                                    {systemMessage || "Your symptoms indicate a condition requiring immediate clinical attention."}
+                                </p>
+                                <div style={{
+                                    padding: "10px 14px",
+                                    background: "var(--bg-input)",
+                                    borderRadius: "var(--radius-md)",
+                                    border: "1px solid var(--border-primary)",
+                                }}>
+                                    <p style={{ fontSize: "0.8125rem", fontWeight: 500, color: "var(--text-primary)", margin: "0 0 4px 0" }}>
+                                        Please proceed to the nearest emergency facility or call the clinic directly.
+                                    </p>
+                                    <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", margin: 0 }}>
+                                        Online booking is not available for emergency cases.
+                                    </p>
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        )}
 
-                    {/* Quick Help Card */}
-                    {!triageData && (
-                        <div className="rounded-xl border border-brand-default bg-brand-card p-6">
-                            <p className="mb-5 text-[10px] font-bold uppercase tracking-widest text-brand-text-muted">
-                                Common Concerns
-                            </p>
-                            <div className="flex flex-wrap gap-2">
-                                {[
-                                    "Acute Toothache",
-                                    "Wisdom Impaction",
-                                    "Scale & Polish",
-                                    "Crown Restoration",
-                                    "Emergency Trauma",
-                                ].map((symptom) => (
-                                    <button
-                                        key={symptom}
-                                        onClick={() => {
-                                            setInput(symptom);
-                                        }}
-                                        className="rounded-lg border border-brand-default bg-brand-secondary px-4 py-2.5 text-[11px] font-bold text-brand-text-secondary transition-all hover:border-brand-hover hover:text-brand-text-primary"
-                                    >
-                                        {symptom}
-                                    </button>
-                                ))}
+                        {/* ── SECTION 3: Clinical Details (Dynamic) ────── */}
+                        <AnimatePresence>
+                            {phase === "CLARIFY" && clarificationIssues && (
+                                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15 }}>
+                                    <ClarificationPanel
+                                        issues={clarificationIssues}
+                                        loading={loading}
+                                        onComplete={(data) => handleClarificationSubmit(data)}
+                                    />
+                                </motion.div>
+                            )}
+
+                            {/* Legacy Fallback for unstructured clarification */}
+                            {phase === "CLARIFY" && !clarificationIssues && (
+                                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15 }}>
+                                    <Section title="Complete Required Clinical Details">
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                                            <p style={{ color: "var(--text-secondary)", fontSize: "0.8125rem", margin: 0, lineHeight: 1.6, paddingBottom: "10px", borderBottom: "1px solid var(--border-primary)" }}>
+                                                Please provide more details about your concern.
+                                            </p>
+                                            <div className="relative">
+                                                <textarea
+                                                    value={symptomText}
+                                                    onChange={(e) => setSymptomText(e.target.value)}
+                                                    className="w-full bg-slate-900/50 border border-slate-700/50 rounded-lg p-4 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all resize-none h-32"
+                                                    placeholder="Describe here..."
+                                                    disabled={loading}
+                                                    style={{ width: "100%", minHeight: "100px" }}
+                                                />
+                                                <button
+                                                    onClick={handleAnalyze}
+                                                    disabled={loading || !symptomText.trim()}
+                                                    className="absolute bottom-4 right-4 p-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    style={{ marginTop: "10px" }}
+                                                >
+                                                    Submit
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </Section>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        {/* ── SECTION 4: Risk Assessment ────────────────── */}
+                        <AnimatePresence>
+                            {orchestration && (phase === "RESULTS" || phase === "SLOTS" || phase === "CONFIRM") && (
+                                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15, delay: 0.05 }}>
+                                    <Section title="Risk Assessment">
+                                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "10px" }}>
+                                            <Metric label="Urgency" value={urgencyLabel(orchestration.overall_urgency)} color={urgencyColor(orchestration.overall_urgency)} />
+                                            <Metric label="Emergency Trigger" value={isEmergency ? "Detected" : "Not Detected"} color={isEmergency ? "var(--clinical-urgent)" : "var(--clinical-safe)"} />
+                                            <Metric label="Airway Risk" value={breathingDifficulty ? "Reported" : "Not Reported"} color={breathingDifficulty ? "var(--clinical-urgent)" : "var(--clinical-safe)"} />
+                                            <Metric
+                                                label="Clinical Status"
+                                                value={triageStatus}
+                                                color={triageStatus === "Specialist Evaluation Identified" ? "var(--success-text)" : "var(--clinical-info)"}
+                                            />
+                                        </div>
+                                        {bookingBlocked && (
+                                            <div style={{
+                                                marginTop: "12px",
+                                                padding: "10px 14px",
+                                                background: "var(--bg-input)",
+                                                borderRadius: "var(--radius-md)",
+                                                borderLeft: "3px solid var(--clinical-warning)",
+                                            }}>
+                                                <p style={{ fontSize: "0.8125rem", fontWeight: 500, color: "var(--text-primary)", margin: 0 }}>
+                                                    {isEmergency
+                                                        ? "Online booking is disabled for emergency cases. Please contact the clinic directly."
+                                                        : "Clinical review required before booking. Additional information may be needed."
+                                                    }
+                                                </p>
+                                            </div>
+                                        )}
+                                        <div style={{
+                                            marginTop: "10px",
+                                            fontSize: "0.75rem",
+                                            color: "var(--text-disabled)",
+                                            lineHeight: 1.5,
+                                        }}>
+                                            Clinical review required — all assessments are subject to provider verification
+                                        </div>
+                                    </Section>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        {/* ── SECTION 5: Routing ────────────────────────── */}
+                        <AnimatePresence>
+                            {orchestration && orchestration.routed_issues.length > 0 && (phase === "RESULTS" || phase === "SLOTS" || phase === "CONFIRM") && (
+                                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15, delay: 0.1 }}>
+                                    <Section title="Proposed Specialist Evaluation">
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+
+                                            {/* Disclaimer Banner */}
+                                            <div style={{
+                                                padding: "10px 12px",
+                                                marginBottom: "10px",
+                                                background: "var(--info-subtle)",
+                                                border: "1px solid var(--clinical-info)",
+                                                borderRadius: "var(--radius-md)",
+                                                fontSize: "0.75rem",
+                                                color: "var(--text-secondary)",
+                                                lineHeight: 1.5,
+                                            }}>
+                                                <strong>Routing Recommendation:</strong> Based on reported symptoms and structured intake responses. Final clinical decisions are made by the treating provider.
+                                            </div>
+
+                                            {orchestration.routed_issues.map((issue, i) => (
+                                                <div key={i} style={{
+                                                    padding: "12px 14px", background: "var(--bg-input)",
+                                                    borderRadius: "var(--radius-md)",
+                                                    borderLeft: `3px solid ${urgencyColor(issue.urgency)}`,
+                                                }}>
+                                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                                        <div>
+                                                            <div style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--text-primary)" }}>
+                                                                {issue.procedure_name || `${issue.specialist_type} Evaluation`}
+                                                            </div>
+                                                            <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "2px" }}>
+                                                                {issue.specialist_type} · {issue.appointment_type || "Consultation"} · {issue.duration_minutes || 30} min
+                                                            </div>
+                                                        </div>
+                                                        <ChevronRight size={14} style={{ color: "var(--text-disabled)" }} />
+                                                    </div>
+                                                    {/* Room & Equipment constraints */}
+                                                    {(issue.room_capability || issue.requires_sedation || issue.requires_anesthetist) && (
+                                                        <div style={{
+                                                            display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap",
+                                                        }}>
+                                                            {issue.room_capability && Object.entries(issue.room_capability).filter(([, v]) => v === true).map(([k]) => (
+                                                                <span key={k} style={{
+                                                                    fontSize: "0.6875rem", padding: "2px 8px",
+                                                                    background: "var(--bg-elevated)", borderRadius: "var(--radius-sm)",
+                                                                    color: "var(--text-secondary)", border: "1px solid var(--border-primary)",
+                                                                }}>
+                                                                    {k.charAt(0).toUpperCase() + k.slice(1)}
+                                                                </span>
+                                                            ))}
+                                                            {issue.requires_sedation && (
+                                                                <span style={{
+                                                                    fontSize: "0.6875rem", padding: "2px 8px",
+                                                                    background: "var(--bg-elevated)", // Neutral bg
+                                                                    borderRadius: "var(--radius-sm)",
+                                                                    color: "var(--text-secondary)", // Neutral text
+                                                                    border: "1px solid var(--border-primary)",
+                                                                }}>
+                                                                    Sedation Capability Available
+                                                                </span>
+                                                            )}
+                                                            {issue.requires_anesthetist && (
+                                                                <span style={{
+                                                                    fontSize: "0.6875rem", padding: "2px 8px",
+                                                                    background: "var(--bg-elevated)",
+                                                                    borderRadius: "var(--radius-sm)",
+                                                                    color: "var(--text-secondary)",
+                                                                    border: "1px solid var(--border-primary)",
+                                                                }}>
+                                                                    Anesthetist Available
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                    {/* Fallback tier info */}
+                                                    {issue.fallback_tier > 1 && issue.fallback_note && (
+                                                        <div style={{
+                                                            marginTop: "6px", fontSize: "0.6875rem",
+                                                            color: "var(--clinical-info)", fontStyle: "italic",
+                                                        }}>
+                                                            {issue.fallback_note}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                            {orchestration.combined_visit_possible && (
+                                                <div style={{
+                                                    fontSize: "0.75rem", color: "var(--clinical-info)",
+                                                    padding: "8px 12px", background: "var(--info-subtle)",
+                                                    borderRadius: "var(--radius-md)",
+                                                }}>
+                                                    Combined visit possible — appointments may be scheduled together to minimize visits
+                                                </div>
+                                            )}
+                                        </div>
+                                    </Section>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        {/* ── SECTION 6: Slots ─────────────────────────── */}
+                        <AnimatePresence>
+                            {(phase === "SLOTS" || phase === "CONFIRM") && slots.length > 0 && (
+                                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15, delay: 0.15 }}>
+                                    <Section title={`Available Appointments (${slots.length})`}>
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                            {slots.slice(0, 8).map((slot, i) => (
+                                                <button
+                                                    key={i}
+                                                    onClick={() => { setSelectedSlot(slot); setPhase("CONFIRM"); }}
+                                                    style={{
+                                                        display: "grid", gridTemplateColumns: "90px 70px 1fr auto",
+                                                        gap: "12px", alignItems: "center",
+                                                        padding: "10px 14px", width: "100%", textAlign: "left",
+                                                        background: selectedSlot === slot ? "var(--accent-subtle)" : "var(--bg-input)",
+                                                        border: `1px solid ${selectedSlot === slot ? "var(--accent-primary)" : "var(--border-primary)"}`,
+                                                        borderRadius: "var(--radius-md)", cursor: "pointer",
+                                                        color: "var(--text-primary)", fontSize: "0.8125rem",
+                                                        fontFamily: "inherit", transition: "border-color var(--transition-fast)",
+                                                    }}
+                                                >
+                                                    <span style={{ fontWeight: 500 }}>{slot.date}</span>
+                                                    <span style={{ color: "var(--accent-primary)", fontWeight: 500 }}>{slot.time}</span>
+                                                    <span style={{ color: "var(--text-secondary)" }}>{slot.doctor_name} — {slot.clinic_name}</span>
+                                                    <span style={{ fontSize: "0.6875rem", color: "var(--text-muted)" }}>{slot.duration_minutes} min</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </Section>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        {/* ── SECTION 7: Confirm ───────────────────────── */}
+                        <AnimatePresence>
+                            {phase === "CONFIRM" && selectedSlot && (
+                                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15 }}>
+                                    <Section title="Confirm Appointment">
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                                            <div style={{
+                                                display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px",
+                                                padding: "14px", background: "var(--bg-input)", borderRadius: "var(--radius-md)",
+                                            }}>
+                                                <DetailField icon={<Calendar size={13} />} label="Date" value={selectedSlot.date} />
+                                                <DetailField icon={<Clock size={13} />} label="Time" value={`${selectedSlot.time} – ${selectedSlot.end_time}`} />
+                                                <DetailField icon={<User size={13} />} label="Provider" value={selectedSlot.doctor_name} />
+                                                <DetailField icon={<Activity size={13} />} label="Reserved Evaluation Time" value={`${selectedSlot.duration_minutes} min`} />
+                                            </div>
+                                            <Field label="Notes for Provider (optional)">
+                                                <textarea
+                                                    value={bookingNotes} onChange={(e) => setBookingNotes(e.target.value)}
+                                                    placeholder="Any additional information..."
+                                                    style={{
+                                                        width: "100%", minHeight: "56px", resize: "vertical",
+                                                        padding: "9px 12px", fontSize: "0.8125rem", lineHeight: 1.6,
+                                                        background: "var(--bg-input)", border: "1px solid var(--border-primary)",
+                                                        borderRadius: "var(--radius-md)", color: "var(--text-primary)", fontFamily: "inherit",
+                                                    }}
+                                                />
+                                            </Field>
+                                            <div style={{ display: "flex", gap: "10px" }}>
+                                                {bookingBlocked ? (
+                                                    <div style={{
+                                                        flex: 1,
+                                                        padding: "12px 16px",
+                                                        background: "var(--bg-input)",
+                                                        borderRadius: "var(--radius-md)",
+                                                        borderLeft: "3px solid var(--clinical-warning)",
+                                                    }}>
+                                                        <p style={{ fontSize: "0.8125rem", fontWeight: 500, color: "var(--text-primary)", margin: "0 0 4px 0" }}>
+                                                            {isEmergency
+                                                                ? "Online booking is not available for emergency cases."
+                                                                : "Additional clinical review is required before booking."
+                                                            }
+                                                        </p>
+                                                        <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", margin: 0 }}>
+                                                            Please contact the clinic directly to schedule your appointment.
+                                                        </p>
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        onClick={handleConfirmBooking} disabled={loading}
+                                                        style={{
+                                                            padding: "10px 24px",
+                                                            background: loading ? "var(--bg-elevated)" : "var(--accent-primary)",
+                                                            color: "#fff", border: "none", borderRadius: "var(--radius-md)",
+                                                            fontSize: "0.8125rem", fontWeight: 500,
+                                                            cursor: loading ? "not-allowed" : "pointer",
+                                                            opacity: loading ? 0.5 : 1,
+                                                            transition: "background var(--transition-fast)",
+                                                        }}
+                                                    >
+                                                        {loading ? "Booking..." : "Confirm Appointment"}
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={() => { setSelectedSlot(null); setPhase("SLOTS"); }}
+                                                    style={{
+                                                        padding: "10px 24px", background: "transparent",
+                                                        color: "var(--text-secondary)", border: "1px solid var(--border-primary)",
+                                                        borderRadius: "var(--radius-md)", fontSize: "0.8125rem", cursor: "pointer",
+                                                    }}
+                                                >
+                                                    Back
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </Section>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        {/* ── Booked ───────────────────────────────────── */}
+                        <AnimatePresence>
+                            {phase === "BOOKED" && (
+                                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15 }}>
+                                    <div style={{
+                                        borderLeft: "3px solid var(--clinical-safe)",
+                                        padding: "16px", borderRadius: "var(--radius-md)",
+                                        background: "var(--bg-card)", border: "1px solid var(--border-primary)",
+                                        borderLeftWidth: "3px", borderLeftColor: "var(--clinical-safe)",
+                                    }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+                                            <CheckCircle2 size={14} style={{ color: "var(--clinical-safe)" }} />
+                                            <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--clinical-safe)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                                                Appointment Confirmed
+                                            </span>
+                                        </div>
+                                        {selectedSlot && (
+                                            <p style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", margin: "0 0 12px 0" }}>
+                                                {selectedSlot.date} at {selectedSlot.time} with {selectedSlot.doctor_name}
+                                            </p>
+                                        )}
+                                        <button onClick={handleNewIntake} style={{
+                                            padding: "8px 16px", background: "transparent",
+                                            color: "var(--text-secondary)", border: "1px solid var(--border-primary)",
+                                            borderRadius: "var(--radius-md)", fontSize: "0.75rem", cursor: "pointer",
+                                        }}>
+                                            New Intake
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+
+                    {/* ── RIGHT PANEL ───────────────────────────────────── */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px", position: "sticky", top: "24px" }}>
+                        {/* Case Summary */}
+                        <div style={{
+                            background: "var(--bg-card)", border: "1px solid var(--border-primary)",
+                            borderRadius: "var(--radius-lg)", padding: "16px",
+                        }}>
+                            <div style={{
+                                fontSize: "0.6875rem", fontWeight: 600, textTransform: "uppercase",
+                                letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: "14px",
+                            }}>
+                                Case Summary
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                                <SummaryRow label="Status" value={
+                                    phase === "INPUT" ? "Awaiting Information" :
+                                        phase === "CLARIFY" ? "Pending Clarification" :
+                                            phase === "RESULTS" ? "Under Review" :
+                                                phase === "SLOTS" ? "Slot Selection" :
+                                                    phase === "CONFIRM" ? "Pending Confirmation" :
+                                                        "Complete"
+                                } />
+                                <SummaryRow
+                                    label="Urgency"
+                                    value={orchestration ? urgencyLabel(orchestration.overall_urgency) : "—"}
+                                    color={orchestration ? urgencyColor(orchestration.overall_urgency) : undefined}
+                                />
+                                <SummaryRow
+                                    label="Issues Identified"
+                                    value={orchestration ? `${Math.max(orchestration.routed_issues.length, isEmergency ? 1 : 0)}` : "—"}
+                                />
+                                <SummaryRow
+                                    label="Risk Flags"
+                                    value={
+                                        isEmergency
+                                            ? (breathingDifficulty ? "Emergency · Airway" : "Emergency")
+                                            : "None"
+                                    }
+                                    color={
+                                        isEmergency
+                                            ? "var(--clinical-urgent)" : undefined
+                                    }
+                                />
+                                <SummaryRow label="Last Updated" value={lastUpdated || "—"} />
+                            </div>
+
+                            {/* Selected Slot */}
+                            {selectedSlot && (
+                                <div style={{ borderTop: "1px solid var(--border-primary)", paddingTop: "10px", marginTop: "10px" }}>
+                                    <div style={{
+                                        fontSize: "0.6875rem", fontWeight: 600, textTransform: "uppercase",
+                                        letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: "6px",
+                                    }}>
+                                        Selected Appointment
+                                    </div>
+                                    <div style={{ fontSize: "0.8125rem", color: "var(--text-primary)" }}>{selectedSlot.date} at {selectedSlot.time}</div>
+                                    <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "2px" }}>{selectedSlot.doctor_name}</div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Disclaimer */}
+                        <div style={{
+                            padding: "14px", background: "var(--bg-card)",
+                            border: "1px solid var(--border-primary)", borderRadius: "var(--radius-md)",
+                        }}>
+                            <div style={{
+                                display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px",
+                            }}>
+                                <Shield size={12} style={{ color: "var(--text-muted)" }} />
+                                <span style={{
+                                    fontSize: "0.6875rem", fontWeight: 600, textTransform: "uppercase",
+                                    letterSpacing: "0.06em", color: "var(--text-muted)",
+                                }}>
+                                    Clinical Safety Notice
+                                </span>
+                            </div>
+                            <div style={{ fontSize: "0.75rem", color: "var(--text-disabled)", lineHeight: 1.6 }}>
+                                This system assists with appointment routing only. It does not provide diagnosis or treatment. All cases are reviewed by licensed dental professionals.
                             </div>
                         </div>
-                    )}
+                    </div>
                 </div>
             </div>
         </DashboardLayout >
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SUB-COMPONENTS
+// ══════════════════════════════════════════════════════════════════════════════
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+    return (
+        <div style={{
+            background: "var(--bg-card)", border: "1px solid var(--border-primary)",
+            borderRadius: "var(--radius-lg)", padding: "20px",
+        }}>
+            <div style={{
+                fontSize: "0.6875rem", fontWeight: 600, textTransform: "uppercase",
+                letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: "14px",
+            }}>
+                {title}
+            </div>
+            {children}
+        </div>
+    );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+    return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+            <label style={{ fontSize: "0.8125rem", color: "var(--text-secondary)", fontWeight: 500 }}>{label}</label>
+            {children}
+        </div>
+    );
+}
+
+function Metric({ label, value, color }: { label: string; value: string; color: string }) {
+    return (
+        <div style={{ padding: "10px 12px", background: "var(--bg-input)", borderRadius: "var(--radius-md)" }}>
+            <div style={{ fontSize: "0.6875rem", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--text-muted)", marginBottom: "3px" }}>
+                {label}
+            </div>
+            <div style={{ fontSize: "0.8125rem", fontWeight: 600, color }}>{value}</div>
+        </div>
+    );
+}
+
+function SummaryRow({ label, value, color }: { label: string; value: string; color?: string }) {
+    return (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{label}</span>
+            <span style={{ fontSize: "0.75rem", fontWeight: 500, color: color || "var(--text-primary)" }}>{value}</span>
+        </div>
+    );
+}
+
+function DetailField({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+    return (
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ color: "var(--text-muted)" }}>{icon}</span>
+            <div>
+                <div style={{ fontSize: "0.6875rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</div>
+                <div style={{ fontSize: "0.8125rem", color: "var(--text-primary)", fontWeight: 500 }}>{value}</div>
+            </div>
+        </div>
     );
 }

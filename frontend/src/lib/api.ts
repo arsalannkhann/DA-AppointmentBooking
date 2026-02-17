@@ -131,10 +131,13 @@ export async function listPatients() {
 }
 
 // ── Triage ──────────────────────────────────────────────────────────────────
-export async function analyzeSymptoms(symptoms: string, history?: any[]) {
+export async function analyzeSymptoms(
+    symptoms: string,
+    history?: { role: "user" | "assistant"; content: string }[]
+) {
     return fetchAPI("/api/triage/analyze", {
         method: "POST",
-        body: JSON.stringify({ symptoms, history }),
+        body: JSON.stringify({ symptoms, history: history || null }),
     });
 }
 
@@ -144,6 +147,16 @@ export async function searchSlots(procedureId: number, needsSedation: boolean = 
         method: "POST",
         body: JSON.stringify({
             procedure_id: procedureId,
+            needs_sedation: needsSedation,
+        }),
+    });
+}
+
+export async function searchSlotsBySpecialist(specialistType: string, needsSedation: boolean = false) {
+    return fetchAPI("/api/slots/search-by-specialist", {
+        method: "POST",
+        body: JSON.stringify({
+            specialist_type: specialistType,
             needs_sedation: needsSedation,
         }),
     });

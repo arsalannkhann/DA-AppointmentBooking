@@ -55,6 +55,73 @@ def search_slots(
     return results
 
 
+class SpecialistSlotSearchRequest(BaseModel):
+    specialist_type: str
+    needs_sedation: bool = False
+    preferred_clinic_id: Optional[str] = None
+    preferred_doctor_id: Optional[str] = None
+
+
+@router.post("/search-by-specialist")
+def search_slots_by_specialist(
+    data: SpecialistSlotSearchRequest,
+    user: UserContext = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+):
+    """
+    Search for available appointment slots by specialist type.
+    Finds any procedure requiring the given specialization and uses it for slot search.
+    Falls back to General Dentist if specialist not found.
+    """
+    from models.models import Specialization
+
+    # Find the specialization
+    spec = db.query(Specialization).filter(Specialization.name == data.specialist_type).first()
+    if not spec:
+        # Fallback to General Dentist
+        spec = db.query(Specialization).filter(Specialization.name == "General Dentist").first()
+    
+    if not spec:
+        raise HTTPException(status_code=404, detail="No specialists available")
+
+    # Find a procedure that uses this specialization
+    proc_query = db.query(Procedure).filter(Procedure.required_spec_id == spec.spec_id)
+    if user.role != "patient":
+        proc_query = proc_query.filter(Procedure.tenant_id == user.tenant_id)
+    procedure = proc_query.first()
+
+    if not procedure:
+        # No procedure for this specialist — try general consultation
+        gen_spec = db.query(Specialization).filter(Specialization.name == "General Dentist").first()
+        if gen_spec:
+            procedure = db.query(Procedure).filter(
+                Procedure.required_spec_id == gen_spec.spec_id
+            ).first()
+    
+    if not procedure:
+        return {
+            "tier": 0,
+            "tier_label": "No Availability",
+            "combo_slots": [],
+            "single_slots": [],
+            "total_found": 0,
+            "note": f"No procedures found for {data.specialist_type}. Please contact the clinic.",
+        }
+
+    preferred_clinic = data.preferred_clinic_id or (str(user.tenant_id) if user.tenant_id else None)
+
+    results = find_with_fallback(
+        db,
+        procedure,
+        data.needs_sedation,
+        preferred_clinic,
+        data.preferred_doctor_id,
+        tenant_id=user.tenant_id if user.role != "patient" else None,
+    )
+
+    return results
+
+
 @router.get("/procedures")
 def list_procedures(
     user: UserContext = Depends(get_current_user),

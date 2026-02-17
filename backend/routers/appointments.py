@@ -18,7 +18,7 @@ router = APIRouter()
 
 class BookingRequest(BaseModel):
     patient_id: str
-    procedure_id: int
+    procedure_id: int | None = None
     slot: dict
 
 

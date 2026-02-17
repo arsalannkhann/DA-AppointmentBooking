@@ -4,13 +4,12 @@ NEVER routes to scheduling without validated clinical intent.
 Tenant-scoped and authenticated.
 """
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from sqlalchemy.orm import Session
 
+from schemas.triage import TriageRequest
 from core.dependencies import get_current_user, get_db_session, UserContext
 from core.intent_analyzer import analyze_intent, CONFIDENCE_THRESHOLD
-from core.triage_engine import triage
 from core.emergency_handler import handle_emergency
 from core.rate_limit import AuthenticatedRateLimit
 from config import RATE_LIMIT_CHATBOT, RATE_LIMIT_TENANT_CHATBOT
@@ -19,11 +18,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-
-class TriageRequest(BaseModel):
-    symptoms: str
-    history: Optional[list[dict]] = None
 
 
 @router.post("/analyze", dependencies=[
@@ -36,115 +30,89 @@ def analyze_symptoms(
     db: Session = Depends(get_db_session),
 ):
     """
-    Full triage pipeline with strict safety controls:
-    1. Intent analysis (greeting → emergency → LLM → keyword)
-    2. Hard guardrail: GREETING/SMALL_TALK/UNKNOWN → never route
-    3. Confidence gate: < 0.7 → force clarification
-    4. Emergency override if red_flag
-    5. Procedure mapping + doctor search (only for routable intents)
+    Clinical Orchestration Pipeline:
+    1. Multi-condition extraction (intent_analyzer) with chat history context
+    2. Clinical issue routing (orchestration_engine)
+    3. Emergency escalation (emergency_handler)
     """
-    intent = analyze_intent(data.symptoms, data.history)
+    from core.orchestration_engine import orchestrate
 
-    # ═══ HARD GUARDRAIL: Non-clinical categories → DO NOT ROUTE ═══
-    if intent.category in ("GREETING", "SMALL_TALK"):
-        return {
-            "intent": intent.to_dict(),
-            "is_emergency": False,
-            "triage": None,
-            "action": "GREET",
-            "message": "👋 Hi! I'm your SmartDental AI assistant. "
-                       "Please describe your dental concern so I can help you book the right appointment.\n\n"
-                       "For example:\n"
-                       '• "I have a throbbing pain in my back tooth"\n'
-                       '• "I need my wisdom teeth removed"\n'
-                       '• "I want a routine checkup and cleaning"',
-        }
+    # Convert Pydantic ChatMessage history to dicts for the analyzer
+    history_dicts = None
+    if data.history:
+        history_dicts = [{"role": m.role, "content": m.content} for m in data.history]
 
-    if intent.category == "APPOINTMENT_REQUEST" and not intent.condition:
-        return {
-            "intent": intent.to_dict(),
-            "is_emergency": False,
-            "triage": None,
-            "action": "CLARIFY",
-            "message": "I'd be happy to help you book an appointment! "
-                       "To find the right specialist, could you describe your dental concern?\n\n"
-                       "For example, are you experiencing pain, do you need a checkup, "
-                       "or is there a specific procedure you need?",
-        }
+    # 1. Intent Analysis (with chat history)
+    intent = analyze_intent(data.symptoms, history_dicts)
 
-    if intent.category == "UNKNOWN" or intent.requires_clarification:
-        return {
-            "intent": intent.to_dict(),
-            "is_emergency": False,
-            "triage": None,
-            "action": "CLARIFY",
-            "message": intent.follow_up_question or (
-                "I need a bit more detail to help you properly. Could you describe:\n"
-                "• Where exactly is the pain or issue?\n"
-                "• Is it sharp, throbbing, or dull?\n"
-                "• How severe is it on a scale of 1–10?\n"
-                "• Is there any swelling or bleeding?"
-            ),
-        }
+    # 2. Orchestration
+    plan = orchestrate(db, intent, tenant_id=user.tenant_id)
 
-    # ═══ CONFIDENCE GATE: Low confidence → force clarification ═══
-    if intent.confidence < CONFIDENCE_THRESHOLD:
-        return {
-            "intent": intent.to_dict(),
-            "is_emergency": False,
-            "triage": None,
-            "action": "CLARIFY",
-            "message": f"I think this might be related to {intent.condition.replace('_', ' ') if intent.condition else 'a dental issue'}, "
-                       f"but I'm not confident enough to proceed (confidence: {intent.confidence:.0%}).\n\n"
-                       + (intent.follow_up_question or "Could you provide more specific details about your symptoms?"),
-        }
+    # 3. Build Response
+    response_payload = plan.to_dict()
 
-        # ═══ EMERGENCY OVERRIDE ═══
-    if intent.red_flag or intent.category == "EMERGENCY":
+    # ── Emergency ────────────────────────────────────────────────────
+    if plan.suggested_action == "ESCALATE":
         emergency_slot = None
-        triage_result = None
         try:
             emergency_slot = handle_emergency(db, tenant_id=user.tenant_id)
-            # Find common emergency procedure
-            triage_result = triage(db, "emergency", False, tenant_id=user.tenant_id)
         except Exception as e:
             logger.warning(f"DB unavailable for emergency lookup: {e}")
 
-        return {
-            "intent": intent.to_dict(),
-            "is_emergency": True,
-            "emergency_slot": emergency_slot,
-            "triage": triage_result.to_dict() if triage_result else None,
-            "action": "EMERGENCY",
-            "message": "🚨 **EMERGENCY DETECTED**\n\n"
-                       + intent.reasoning + "\n\n"
-                       + ("An immediate triage slot has been found." if emergency_slot
-                          else "Please visit the nearest Emergency Room or call emergency services immediately."),
-        }
+        response_payload["emergency_slot"] = emergency_slot
+        response_payload["message"] = (
+            "🚨 **EMERGENCY DETECTED**\n\n"
+            "Your symptoms indicate a condition requiring immediate attention.\n"
+            + ("An emergency slot has been reserved." if emergency_slot else "Please proceed to the nearest emergency room.")
+        )
+        return response_payload
 
-    # ═══ VALIDATED CLINICAL INTENT → Proceed to triage ═══
-    triage_result = None
-    try:
-        triage_result = triage(db, intent.condition, intent.requires_sedation, tenant_id=user.tenant_id)
-    except Exception as e:
-        logger.warning(f"DB unavailable for triage: {e}")
+    # ── Greeting ─────────────────────────────────────────────────────
+    if plan.suggested_action == "GREETING":
+        response_payload["message"] = (
+            "👋 Hi! I'm your SmartDental AI assistant. "
+            "I can help you book appointments for multiple issues at once.\n\n"
+            "Please describe your symptoms, for example:\n"
+            '• "I have a toothache and also need a cleaning"'
+        )
 
-    if not triage_result:
-        return {
-            "intent": intent.to_dict(),
-            "is_emergency": False,
-            "triage": None,
-            "action": "CLARIFY",
-            "message": f"AI analysis identified: **{intent.condition.replace('_', ' ')}** (confidence: {intent.confidence:.0%}).\n\n"
-                       "However, I couldn't find a matching procedure in our system. "
-                       "Could you provide additional details?",
-        }
+    # ── Small Talk ───────────────────────────────────────────────────
+    elif plan.suggested_action == "SMALL_TALK":
+        response_payload["message"] = (
+            "I am a clinical AI designed to help triage dental concerns and schedule specialist evaluations. "
+            "I don't diagnose or prescribe — I help connect you with the right specialist.\n\n"
+            "How can I help you today?"
+        )
 
-    return {
-        "intent": intent.to_dict(),
-        "is_emergency": False,
-        "triage": triage_result.to_dict(),
-        "action": "ROUTE",
-        "message": f"Based on your symptoms, you may need: **{triage_result.procedure_name}** "
-                   f"(confidence: {intent.confidence:.0%})",
-    }
+    # ── Clarification ────────────────────────────────────────────────
+    elif plan.suggested_action == "CLARIFY":
+        questions = plan.clarification_questions or intent.clarification_questions or ["Could you provide more details?"]
+
+        # Sentiment-aware tone
+        if plan.patient_sentiment == "Anxious":
+            intro = "I understand this can be concerning. To make sure we connect you with the right specialist, I need a bit more information:\n\n"
+        elif plan.patient_sentiment == "Frustrated":
+            intro = "I want to help you as quickly as possible. I just need a few more details:\n\n"
+        else:
+            intro = "I need a bit more information to help you effectively:\n\n"
+
+        response_payload["message"] = intro + "\n".join([f"• {q}" for q in questions])
+
+    # ── Orchestrate (Success) ────────────────────────────────────────
+    elif plan.suggested_action == "ORCHESTRATE":
+        summaries = []
+        for i, issue in enumerate(plan.routed_issues):
+            specialist = issue.triage_result.specialist_type if issue.triage_result else "Dentist"
+            sedation_note = " *(sedation available)*" if (issue.triage_result and issue.triage_result.requires_sedation) else ""
+            summaries.append(f"{i+1}. **{issue.symptom_cluster}** → Evaluation by **{specialist}**{sedation_note}")
+
+        combo_text = ""
+        if plan.combined_visit_possible and len(plan.routed_issues) > 1:
+            combo_text = "\n\n✨ Good news — we may be able to schedule these evaluations during a **single visit**."
+
+        issue_word = "concern" if len(plan.routed_issues) == 1 else "concerns"
+        intro = f"Based on the information provided, I've identified **{len(plan.routed_issues)} {issue_word}** that warrant specialist evaluation:\n\n"
+
+        response_payload["message"] = intro + "\n".join(summaries) + combo_text
+
+    return response_payload
