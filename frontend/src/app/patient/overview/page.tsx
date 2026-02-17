@@ -96,8 +96,8 @@ export default function PatientOverviewPage() {
             description: "Chat with our AI assistant to find the perfect time",
             icon: MessageSquarePlus,
             href: "/patient/book",
-            color: "from-indigo-500 to-violet-500",
-            shadowColor: "shadow-indigo-500/20",
+            color: "from-cyan-500 to-teal-500",
+            shadowColor: "shadow-cyan-500/20",
         },
         {
             title: "My Appointments",
@@ -128,7 +128,7 @@ export default function PatientOverviewPage() {
                 {/* Quick Actions */}
                 <motion.div variants={fadeUp}>
                     <div className="mb-4 flex items-center gap-2">
-                        <Sparkles className="h-4 w-4 text-indigo-400" />
+                        <Sparkles className="h-4 w-4 text-cyan-400" />
                         <h2 className="text-sm font-bold uppercase tracking-wider text-brand-text-muted">
                             Quick Actions
                         </h2>
@@ -162,8 +162,8 @@ export default function PatientOverviewPage() {
                 <motion.div variants={fadeUp} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <div className="rounded-2xl border border-white/10 bg-brand-secondary/50 p-5 backdrop-blur-sm">
                         <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10">
-                                <CalendarCheck className="h-5 w-5 text-indigo-400" />
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/10">
+                                <CalendarCheck className="h-5 w-5 text-cyan-400" />
                             </div>
                             <div>
                                 <p className="text-2xl font-black text-white">{upcomingAppointments.length}</p>
@@ -217,7 +217,7 @@ export default function PatientOverviewPage() {
                 <motion.div variants={fadeUp}>
                     <div className="mb-4 flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            <CalendarDays className="h-4 w-4 text-indigo-400" />
+                            <CalendarDays className="h-4 w-4 text-cyan-400" />
                             <h2 className="text-sm font-bold uppercase tracking-wider text-brand-text-muted">
                                 Upcoming Appointments
                             </h2>
@@ -225,7 +225,7 @@ export default function PatientOverviewPage() {
                         {upcomingAppointments.length > 0 && (
                             <Link
                                 href="/patient/appointments"
-                                className="text-xs font-bold text-indigo-400 hover:text-indigo-300 transition-colors"
+                                className="text-xs font-bold text-cyan-400 hover:text-cyan-300 transition-colors"
                             >
                                 View All →
                             </Link>

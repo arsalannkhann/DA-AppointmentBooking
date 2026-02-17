@@ -14,9 +14,9 @@
   --color-brand-elevated: #374151;
   --color-brand-input: #111827;
 
-  --color-brand-accent: #4f46e5;
-  --color-brand-accent-hover: #4338ca;
-  --color-brand-accent-subtle: rgba(79, 70, 229, 0.08);
+  --color-brand-accent: #06b6d4;
+  --color-brand-accent-hover: #0891b2;
+  --color-brand-accent-subtle: rgba(6, 182, 212, 0.08);
 
   --font-family-sans: 'Inter', system-ui, -apple-system, sans-serif;
 }
@@ -37,11 +37,11 @@
   --border-active: rgba(79, 70, 229, 0.5);
   --border-subtle: #1f2937;
 
-  /* Accent Colors - Professional Indigo */
-  --accent-primary: #4f46e5;
-  --accent-hover: #4338ca;
-  --accent-subtle: rgba(79, 70, 229, 0.08);
-  --accent-text: #818cf8;
+  /* Accent Colors - Professional Teal/Cyan */
+  --accent-primary: #06b6d4;
+  --accent-hover: #0891b2;
+  --accent-subtle: rgba(6, 182, 212, 0.08);
+  --accent-text: #22d3ee;
 
   /* Typography Hierarchy */
   --text-primary: #f9fafb;

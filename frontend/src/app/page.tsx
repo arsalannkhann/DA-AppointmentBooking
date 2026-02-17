@@ -126,7 +126,7 @@ export default function LandingPage() {
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white leading-tight tracking-tight mb-6">
               Enterprise Clinical
               <br />
-              <span className="text-indigo-400">Orchestration Platform</span>
+              <span className="text-cyan-400">Orchestration Platform</span>
             </h1>
 
             <p className="text-xl text-brand-text-secondary max-w-3xl mx-auto leading-relaxed mb-10">
@@ -137,7 +137,7 @@ export default function LandingPage() {
             <div className="flex flex-wrap justify-center gap-4">
               <button
                 onClick={() => router.push("/register/patient")}
-                className="group flex items-center gap-2 rounded-xl bg-indigo-600 px-8 py-4 text-sm font-semibold text-white transition-all hover:bg-indigo-500"
+                className="group flex items-center gap-2 rounded-xl bg-cyan-600 px-8 py-4 text-sm font-semibold text-white transition-all hover:bg-cyan-500"
               >
                 Start Clinical Intake
                 <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
@@ -174,7 +174,7 @@ export default function LandingPage() {
       <section className="py-24 px-6 border-t border-white/5">
         <div className="max-w-7xl mx-auto">
           <div className="mb-16 text-center">
-            <h6 className="text-indigo-400 font-semibold uppercase tracking-wider mb-4">
+            <h6 className="text-cyan-400 font-semibold uppercase tracking-wider mb-4">
               Platform Capabilities
             </h6>
             <h2 className="text-4xl font-bold text-white mb-4">
@@ -194,9 +194,9 @@ export default function LandingPage() {
                 initial="initial"
                 whileInView="animate"
                 viewport={{ once: true }}
-                className="group rounded-xl border border-white/10 bg-white/5 p-8 transition-all hover:border-indigo-500/40 hover:bg-white/10"
+                className="group rounded-xl border border-white/10 bg-white/5 p-8 transition-all hover:border-cyan-500/40 hover:bg-white/10"
               >
-                <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
                   <feature.icon size={28} strokeWidth={2} />
                 </div>
                 <h3 className="text-xl font-semibold text-white mb-3">
@@ -215,7 +215,7 @@ export default function LandingPage() {
       <section className="py-24 px-6 border-t border-white/5 bg-white/[0.02]">
         <div className="mx-auto max-w-7xl">
           <div className="mx-auto max-w-2xl text-center mb-16">
-            <h6 className="text-indigo-400 font-semibold uppercase tracking-wider mb-4">
+            <h6 className="text-cyan-400 font-semibold uppercase tracking-wider mb-4">
               Clinical Workflow
             </h6>
             <h2 className="text-4xl font-bold text-white mb-4">
@@ -250,7 +250,7 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-12">
             <div className="flex items-start gap-6 mb-8">
-              <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+              <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
                 <Shield size={32} strokeWidth={2} />
               </div>
               <div>
@@ -288,18 +288,18 @@ export default function LandingPage() {
       {/* CTA Section */}
       <section className="py-24 px-6">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="rounded-2xl bg-gradient-to-br from-indigo-600 to-indigo-700 p-16 shadow-2xl">
+          <div className="rounded-2xl bg-gradient-to-br from-cyan-600 to-cyan-700 p-16 shadow-2xl">
             <h2 className="text-4xl font-bold text-white mb-6">
               Ready to Transform Clinical Operations?
             </h2>
-            <p className="text-lg text-indigo-100 mb-10 max-w-2xl mx-auto">
+            <p className="text-lg text-cyan-50 mb-10 max-w-2xl mx-auto">
               Join healthcare organizations using AI-powered scheduling to optimize
               resource utilization and improve patient access.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <button
                 onClick={() => router.push("/register")}
-                className="rounded-xl bg-white px-10 py-4 text-sm font-semibold text-indigo-600 transition-all hover:scale-105"
+                className="rounded-xl bg-white px-10 py-4 text-sm font-semibold text-cyan-600 transition-all hover:scale-105"
               >
                 Get Started
               </button>
@@ -319,7 +319,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-7xl px-6">
           <div className="flex flex-col items-center justify-between gap-6 sm:flex-row">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-600">
                 <Activity size={20} className="text-white" />
               </div>
               <span className="text-lg font-semibold text-white">Clinical Orchestration</span>

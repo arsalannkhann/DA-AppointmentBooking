@@ -460,9 +460,9 @@ export default function ClinicalIntakePage() {
                     ].map((s, i) => (
                         <div key={s.n} className="flex items-center gap-3">
                             {i > 0 && (
-                                <div className={`w-12 h-0.5 transition-colors ${currentStep.step > i ? "bg-indigo-500" : "bg-white/10"}`} />
+                                <div className={`w-12 h-0.5 transition-colors ${currentStep.step > i ? "bg-cyan-500" : "bg-white/10"}`} />
                             )}
-                            <div className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-semibold transition-all ${currentStep.step >= s.n ? "bg-indigo-600 text-white" : "bg-white/5 text-brand-text-muted border border-white/10"}`}>
+                            <div className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-semibold transition-all ${currentStep.step >= s.n ? "bg-cyan-600 text-white" : "bg-white/5 text-brand-text-muted border border-white/10"}`}>
                                 {currentStep.step > s.n ? <CheckCircle2 size={16} /> : s.n}
                             </div>
                             <span className={`text-sm font-medium transition-colors ${currentStep.step >= s.n ? "text-white" : "text-brand-text-muted"}`}>
@@ -519,7 +519,7 @@ export default function ClinicalIntakePage() {
                                                 handleAnalyze();
                                             }
                                         }}
-                                        className="w-full min-h-[120px] resize-vertical p-4 pb-10 text-sm leading-relaxed bg-brand-input border border-white/10 rounded-lg text-white placeholder-brand-text-muted focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                                        className="w-full min-h-[120px] resize-vertical p-4 pb-10 text-sm leading-relaxed bg-brand-input border border-white/10 rounded-lg text-white placeholder-brand-text-muted focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all"
                                     />
                                     <span className={`absolute bottom-3 right-4 text-xs ${charCount > MAX_CHARS * 0.9 ? "text-amber-400" : "text-brand-text-disabled"}`}>
                                         {charCount}/{MAX_CHARS}
@@ -757,8 +757,8 @@ export default function ClinicalIntakePage() {
                                         </div>
 
                                         {/* Liability Disclaimer */}
-                                        <div className="p-3 mb-4 bg-indigo-500/10 border border-indigo-500/20 rounded-lg">
-                                            <p className="text-xs text-indigo-200 leading-relaxed">
+                                        <div className="p-3 mb-4 bg-cyan-500/10 border border-cyan-500/20 rounded-lg">
+                                            <p className="text-xs text-cyan-200 leading-relaxed">
                                                 <strong>Routing Recommendation:</strong> Based on reported symptoms and structured intake responses. 
                                                 Final clinical decisions are made by the treating provider.
                                             </p>
@@ -812,8 +812,8 @@ export default function ClinicalIntakePage() {
                                             ))}
 
                                             {orchestration.combined_visit_possible && (
-                                                <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-lg">
-                                                    <p className="text-xs text-indigo-200">
+                                                <div className="p-3 bg-cyan-500/10 border border-cyan-500/20 rounded-lg">
+                                                    <p className="text-xs text-cyan-200">
                                                         Combined visit possible — appointments may be scheduled together to minimize visits
                                                     </p>
                                                 </div>

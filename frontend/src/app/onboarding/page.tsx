@@ -135,7 +135,7 @@ function OnboardingContent() {
             >
                 {/* Header */}
                 <div className="mb-8 text-center">
-                    <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-xl bg-indigo-600 shadow-lg">
+                    <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-xl bg-cyan-600 shadow-lg">
                         <Sparkles className="h-7 w-7 text-white" />
                     </div>
                     <h1 className="text-3xl font-black tracking-tight text-white mb-2">
@@ -174,7 +174,7 @@ function OnboardingContent() {
                                                         type="text"
                                                         value={room.name}
                                                         onChange={(e) => updateRoom(idx, "name", e.target.value)}
-                                                        className="w-full rounded-xl border border-white/10 bg-brand-primary py-3 pl-10 pr-4 text-sm text-white focus:border-indigo-500 outline-none"
+                                                        className="w-full rounded-xl border border-white/10 bg-brand-primary py-3 pl-10 pr-4 text-sm text-white focus:border-cyan-500 outline-none"
                                                         placeholder="e.g. Operatory 1"
                                                     />
                                                 </div>
@@ -184,7 +184,7 @@ function OnboardingContent() {
                                                 <select
                                                     value={room.type}
                                                     onChange={(e) => updateRoom(idx, "type", e.target.value)}
-                                                    className="w-full rounded-xl border border-white/10 bg-brand-primary py-3 px-4 text-sm text-white focus:border-indigo-500 outline-none appearance-none"
+                                                    className="w-full rounded-xl border border-white/10 bg-brand-primary py-3 px-4 text-sm text-white focus:border-cyan-500 outline-none appearance-none"
                                                 >
                                                     <option value="operatory">Operatory</option>
                                                     <option value="hygiene">Hygiene</option>
@@ -201,7 +201,7 @@ function OnboardingContent() {
                                     ))}
                                 </div>
 
-                                <button onClick={addRoomField} className="flex items-center gap-2 text-sm font-bold text-indigo-400 hover:text-indigo-300">
+                                <button onClick={addRoomField} className="flex items-center gap-2 text-sm font-bold text-cyan-400 hover:text-cyan-300">
                                     <Plus size={16} /> Add Another Room
                                 </button>
 
@@ -209,7 +209,7 @@ function OnboardingContent() {
                                     <button
                                         onClick={handleSaveRooms}
                                         disabled={isLoading}
-                                        className="ml-auto flex items-center gap-2 rounded-xl bg-indigo-600 px-8 py-3 text-sm font-bold text-white hover:bg-indigo-500"
+                                        className="ml-auto flex items-center gap-2 rounded-xl bg-cyan-600 px-8 py-3 text-sm font-bold text-white hover:bg-cyan-500"
                                     >
                                         {isLoading ? "Saving..." : "Next Step"} <ArrowRight size={16} />
                                     </button>
@@ -237,7 +237,7 @@ function OnboardingContent() {
                                                         type="text"
                                                         value={doc.name}
                                                         onChange={(e) => updateDoctor(idx, e.target.value)}
-                                                        className="w-full rounded-xl border border-white/10 bg-brand-primary py-3 pl-10 pr-4 text-sm text-white focus:border-indigo-500 outline-none"
+                                                        className="w-full rounded-xl border border-white/10 bg-brand-primary py-3 pl-10 pr-4 text-sm text-white focus:border-cyan-500 outline-none"
                                                         placeholder="e.g. Dr. Smith"
                                                     />
                                                 </div>
@@ -254,7 +254,7 @@ function OnboardingContent() {
                                     </p>
                                 </div>
 
-                                <button onClick={addDoctorField} className="flex items-center gap-2 text-sm font-bold text-indigo-400 hover:text-indigo-300">
+                                <button onClick={addDoctorField} className="flex items-center gap-2 text-sm font-bold text-cyan-400 hover:text-cyan-300">
                                     <Plus size={16} /> Add Another Doctor
                                 </button>
 

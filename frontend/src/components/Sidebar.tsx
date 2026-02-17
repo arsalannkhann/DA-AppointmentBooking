@@ -165,7 +165,7 @@ export default function Sidebar({
                         href="/"
                         className={`flex items-center gap-3 ${!isOpen && "justify-center"}`}
                     >
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-indigo-600">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-cyan-600">
                             <Activity size={20} className="text-white" />
                         </div>
                         <AnimatePresence>
@@ -220,7 +220,7 @@ export default function Sidebar({
                                     key={link.href}
                                     href={link.href}
                                     className={`group relative flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-all ${isActive
-                                        ? "bg-brand-accent/10 text-brand-accent"
+                                        ? "bg-cyan-500/10 text-cyan-400"
                                         : "text-brand-text-secondary hover:bg-brand-secondary hover:text-white"
                                         } ${!isOpen && "justify-center"}`}
                                 >
@@ -228,12 +228,12 @@ export default function Sidebar({
                                     {isActive && isOpen && (
                                         <motion.div
                                             layoutId="activeNav"
-                                            className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full bg-brand-accent"
+                                            className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full bg-cyan-500"
                                         />
                                     )}
 
                                     <div
-                                        className={`flex h-5 w-5 items-center justify-center transition-colors ${isActive ? "text-brand-accent" : "text-brand-text-muted group-hover:text-white"
+                                        className={`flex h-5 w-5 items-center justify-center transition-colors ${isActive ? "text-cyan-400" : "text-brand-text-muted group-hover:text-white"
                                             }`}
                                     >
                                         <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />

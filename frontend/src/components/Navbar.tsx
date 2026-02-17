@@ -57,7 +57,7 @@ export default function Navbar() {
                             {pathname === link.href && (
                                 <motion.div
                                     layoutId="navbar-underline"
-                                    className="absolute -bottom-1 left-0 right-0 h-0.5 bg-indigo-500"
+                                    className="absolute -bottom-1 left-0 right-0 h-0.5 bg-cyan-500"
                                 />
                             )}
                         </Link>
@@ -69,7 +69,7 @@ export default function Navbar() {
                     {user ? (
                         <Link
                             href={user.role === "admin" ? "/admin/dashboard" : "/patient/overview"}
-                            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-all hover:bg-indigo-500"
+                            className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white transition-all hover:bg-cyan-500"
                         >
                             Dashboard
                         </Link>
@@ -83,7 +83,7 @@ export default function Navbar() {
                             </Link>
                             <Link
                                 href="/register"
-                                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-all hover:bg-indigo-500"
+                                className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white transition-all hover:bg-cyan-500"
                             >
                                 Get Started
                             </Link>
@@ -116,7 +116,7 @@ export default function Navbar() {
                                 onClick={() => setIsMobileMenuOpen(false)}
                                 className={`block rounded-lg px-4 py-3 text-sm font-medium transition-colors ${
                                     pathname === link.href
-                                        ? "bg-indigo-500/10 text-indigo-400"
+                                        ? "bg-cyan-500/10 text-cyan-400"
                                         : "text-brand-text-secondary hover:bg-brand-secondary hover:text-white"
                                 }`}
                             >
@@ -128,7 +128,7 @@ export default function Navbar() {
                                 <Link
                                     href={user.role === "admin" ? "/admin/dashboard" : "/patient/overview"}
                                     onClick={() => setIsMobileMenuOpen(false)}
-                                    className="block w-full rounded-lg bg-indigo-600 px-4 py-3 text-center text-sm font-medium text-white hover:bg-indigo-500"
+                                    className="block w-full rounded-lg bg-cyan-600 px-4 py-3 text-center text-sm font-medium text-white hover:bg-cyan-500"
                                 >
                                     Dashboard
                                 </Link>
@@ -144,7 +144,7 @@ export default function Navbar() {
                                     <Link
                                         href="/register"
                                         onClick={() => setIsMobileMenuOpen(false)}
-                                        className="block w-full rounded-lg bg-indigo-600 px-4 py-3 text-center text-sm font-medium text-white hover:bg-indigo-500"
+                                        className="block w-full rounded-lg bg-cyan-600 px-4 py-3 text-center text-sm font-medium text-white hover:bg-cyan-500"
                                     >
                                         Get Started
                                     </Link>

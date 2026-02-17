@@ -52,7 +52,7 @@ export default function PatientLoginPage() {
                 className="relative z-10 w-full max-w-md space-y-8"
             >
                 <div className="text-center">
-                    <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-xl bg-indigo-600 shadow-lg shadow-indigo-500/20">
+                    <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-xl bg-cyan-600 shadow-lg shadow-cyan-500/20">
                         <Heart className="h-7 w-7 text-white" />
                     </div>
                     <h2 className="text-3xl font-black tracking-tight text-white">Patient Portal</h2>
@@ -79,7 +79,7 @@ export default function PatientLoginPage() {
                                     required
                                     value={formData.email}
                                     onChange={handleChange}
-                                    className="w-full rounded-xl border border-white/10 bg-brand-primary py-3 pl-10 pr-4 text-sm text-white placeholder-brand-text-muted outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+                                    className="w-full rounded-xl border border-white/10 bg-brand-primary py-3 pl-10 pr-4 text-sm text-white placeholder-brand-text-muted outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all"
                                     placeholder="patient@example.com"
                                 />
                             </div>
@@ -88,7 +88,7 @@ export default function PatientLoginPage() {
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
                                 <label className="text-[10px] font-bold uppercase tracking-widest text-brand-text-muted">Password</label>
-                                <a href="#" className="text-xs font-medium text-indigo-400 hover:text-indigo-300 transition-colors">
+                                <a href="#" className="text-xs font-medium text-cyan-400 hover:text-cyan-300 transition-colors">
                                     Forgot password?
                                 </a>
                             </div>
@@ -100,7 +100,7 @@ export default function PatientLoginPage() {
                                     required
                                     value={formData.password}
                                     onChange={handleChange}
-                                    className="w-full rounded-xl border border-white/10 bg-brand-primary py-3 pl-10 pr-4 text-sm text-white placeholder-brand-text-muted outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+                                    className="w-full rounded-xl border border-white/10 bg-brand-primary py-3 pl-10 pr-4 text-sm text-white placeholder-brand-text-muted outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all"
                                     placeholder="••••••••"
                                 />
                             </div>
@@ -109,7 +109,7 @@ export default function PatientLoginPage() {
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="group relative w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white transition-all hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="group relative w-full flex items-center justify-center gap-2 rounded-xl bg-cyan-600 py-3 text-sm font-bold text-white transition-all hover:bg-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {isLoading ? (
                                 <Loader2 className="h-5 w-5 animate-spin" />
@@ -124,7 +124,7 @@ export default function PatientLoginPage() {
 
                     <div className="mt-6 text-center text-xs text-brand-text-secondary">
                         Don&apos;t have an account?{" "}
-                        <Link href="/register/patient" className="font-bold text-indigo-400 hover:text-indigo-300">
+                        <Link href="/register/patient" className="font-bold text-cyan-400 hover:text-cyan-300">
                             Create Account
                         </Link>
                     </div>
@@ -133,7 +133,7 @@ export default function PatientLoginPage() {
                         <p className="text-xs text-brand-text-secondary mb-2">Are you a clinic administrator?</p>
                         <Link
                             href="/login"
-                            className="text-xs font-medium text-indigo-300 hover:text-white transition-colors"
+                            className="text-xs font-medium text-cyan-300 hover:text-white transition-colors"
                         >
                             Go to Staff Login
                         </Link>

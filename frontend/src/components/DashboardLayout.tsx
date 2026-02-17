@@ -120,7 +120,7 @@ export default function DashboardLayout({
                     <div className="flex items-center gap-3">
                         {/* Global Search */}
                         <div className="relative hidden md:block">
-                            <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-brand-secondary/50 px-3 py-2 transition-all focus-within:border-indigo-500/50 focus-within:ring-2 focus-within:ring-indigo-500/10">
+                            <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-brand-secondary/50 px-3 py-2 transition-all focus-within:border-cyan-500/50 focus-within:ring-2 focus-within:ring-cyan-500/10">
                                 <Search size={16} className="text-brand-text-muted" />
                                 <input
                                     type="text"
@@ -180,7 +180,7 @@ export default function DashboardLayout({
                                                             ? "bg-rose-500"
                                                             : notification.type === "success"
                                                                 ? "bg-emerald-500"
-                                                                : "bg-indigo-500"
+                                                                : "bg-cyan-500"
                                                             }`}
                                                     />
                                                     <div className="flex-1">
