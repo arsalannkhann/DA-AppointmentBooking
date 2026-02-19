@@ -67,8 +67,8 @@ flowchart TD
     APIClarify --> |"I need a bit more info: Is there swelling?"| Patient
     
     %% Gate Open
-    Gate --> |No (Gate Open)| Loop[[For each Clinical Issue]]
-    Loop --> Rules[Clinical Rules Classification<br>_classify_condition]
+    Gate --> |No (Gate Open)| ProcessLoop[For each Clinical Issue]
+    ProcessLoop --> Rules[Clinical Rules Classification<br>_classify_condition]
     Rules --> |"condition_key"| Resolve[Resolve Procedure]
     Resolve -.-> DB
     Resolve --> Scheduler[Constraint-Aware Scheduler<br>_find_slots]
