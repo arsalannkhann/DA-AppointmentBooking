@@ -51,34 +51,34 @@ flowchart TD
     Analyzer --> |"Extracted Clinical Issues & Sentiment"| Orchestrator[Orchestration Engine]
     
     %% Emergency Check
-    Orchestrator --> EmergencyCheck{Emergency<br>Override?}
-    EmergencyCheck --> |Yes| Bypass[Bypass limits for emergency slots]
+    Orchestrator --> EmergencyCheck{"Emergency<br>Override?"}
+    EmergencyCheck -->|"Yes"| Bypass["Bypass limits for emergency slots"]
     Bypass --> SchedEmerg[Scheduler]
     SchedEmerg -.-> DB[(PostgreSQL)]
-    SchedEmerg --> |"Emergency Slot"| APIEmerg[Action: ESCALATE]
-    APIEmerg --> |"🚨 EMERGENCY DETECTED"| Patient
+    SchedEmerg -->|"Emergency Slot"| APIEmerg["Action: ESCALATE"]
+    APIEmerg -->|"🚨 EMERGENCY DETECTED"| Patient
 
     %% Normal Flow
-    EmergencyCheck --> |No| Gate{Clinical Gate<br>Missing Info?}
+    EmergencyCheck -->|"No"| Gate{"Clinical Gate<br>Missing Info?"}
     
     %% Clarification
-    Gate --> |Yes| Clarify[Get Validation Questions]
-    Clarify --> APIClarify[Action: CLARIFY]
-    APIClarify --> |"I need a bit more info: Is there swelling?"| Patient
+    Gate -->|"Yes"| Clarify["Get Validation Questions"]
+    Clarify --> APIClarify["Action: CLARIFY"]
+    APIClarify -->|"I need a bit more info: Is there swelling?"| Patient
     
     %% Gate Open
-    Gate --> |No (Gate Open)| ProcessLoop[For each Clinical Issue]
-    ProcessLoop --> Rules[Clinical Rules Classification<br>_classify_condition]
-    Rules --> |"condition_key"| Resolve[Resolve Procedure]
+    Gate -->|"No (Gate Open)"| ProcessLoop[For each Clinical Issue]
+    ProcessLoop --> Rules["Clinical Rules Classification<br>_classify_condition"]
+    Rules -->|"condition_key"| Resolve["Resolve Procedure"]
     Resolve -.-> DB
-    Resolve --> Scheduler[Constraint-Aware Scheduler<br>_find_slots]
+    Resolve --> Scheduler["Constraint-Aware Scheduler<br>_find_slots"]
     Scheduler -.-> DB
-    Scheduler --> |"Ranked Slots (Primary/Fallback)"| CombineCheck{Multiple<br>Issues?}
+    Scheduler -->|"Ranked Slots (Primary/Fallback)"| CombineCheck{"Multiple<br>Issues?"}
     
-    CombineCheck --> |Yes| CheckCombos[Check if slots share Clinic/Time]
-    CheckCombos --> Plan[Build Orchestration Plan]
-    CombineCheck --> |No| Plan
+    CombineCheck -->|"Yes"| CheckCombos["Check if slots share Clinic/Time"]
+    CheckCombos --> Plan["Build Orchestration Plan"]
+    CombineCheck -->|"No"| Plan
     
-    Plan --> APIPlan[Action: ORCHESTRATE]
-    APIPlan --> |"Based on symptoms, here are slots..."| Patient
+    Plan --> APIPlan["Action: ORCHESTRATE"]
+    APIPlan -->|"Based on symptoms, here are slots..."| Patient
 ```
