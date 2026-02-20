@@ -16,9 +16,31 @@ Before routing scheduling, the **Clinical Gate** acts as an AI "Doctor". It eval
 - The system interrupts the flow and returns these clarification questions to the user (`suggested_action = "CLARIFY"`).
 
 ## 4. Clinical Rules Classification ([orchestration_engine.py](file:///home/ubuntu/bronn-dev/backend/core/orchestration_engine.py))
-If the clinical gate determines the information is complete, the **Orchestration Engine** takes over.
-- It applies deterministic **Clinical Rules** ([_classify_condition](file:///home/ubuntu/bronn-dev/backend/core/orchestration_engine.py#200-261)) to map the extracted feature flags (like swelling + wisdom) into a standardized `condition_key` (e.g., `wisdom_extraction`, `root_canal`).
-- This guarantees that similar symptom presentations predictably result in the same medical categorization without hallucination.
+If the clinical gate determines the information is complete, the **Orchestration Engine** takes over. 
+
+It applies deterministic **Clinical Rules** ([_classify_condition](file:///home/ubuntu/bronn-dev/backend/core/orchestration_engine.py#200-261)) to map the extracted feature flags (like swelling + wisdom) into a standardized `condition_key` (e.g., `wisdom_extraction`, `root_canal`). This guarantees that similar symptom presentations predictably result in the same medical categorization without hallucination.
+
+**Why this exists:**
+Language models (LLMs) are great at reading a paragraph and extracting facts like "patient has swelling" and "pain level is 8". However, LLMs are not good at consistently applying medical routing logic without occasionally hallucinating or changing their minds. By separating the flow, the LLM only does extraction (Intent Analyzer), and this `_classify_condition` function does the medical logic. This guarantees that if two different patients both have [Swelling + Wisdom Tooth Pain], they will 100% of the time be routed to the exact same surgical path.
+
+**How it works step-by-step:**
+The function evaluates the extracted issue data through a strict hierarchy of Tiers (from most urgent to least urgent). As soon as a tier's conditions are met, it instantly returns that classification and stops checking the others.
+
+*   **Tier 1: Emergency Rules (Target: `"emergency"`)**
+    The system first checks for life-threatening or immediate-action flags. If the LLM extracted that the patient has Airway compromise, Dental trauma, or Uncontrolled bleeding, the system immediately classifies this as an `"emergency"`.
+*   **Tier 2: Endodontic Rules (Target: `"root_canal"`)**
+    If it's not an emergency, it checks for nerve/root damage. The rule states that a patient needs a root canal evaluation IF Pain severity is Severe (7 or higher out of 10) AND there is pain present AND they have either Thermal Sensitivity (pain from hot/cold) OR Biting Pain AND they do not have swelling.
+*   **Tier 3: Surgical Rules (Target: `"wisdom_extraction"`)**
+    Next, it looks for surgical indicators. It routes to oral surgery IF the patient has Swelling AND (an impacted wisdom tooth OR the word "wisdom" in their symptoms), OR the patient has Swelling AND the word "extraction" is in their symptoms.
+*   **Tier 4: Restorative Rules (Target: `"filling"`)**
+    If none of the severe surgical or endodontic rules triggered, it checks for a basic cavity. It routes to a general filling evaluation IF the patient has pain AND the pain severity is Moderate (6 or lower out of 10) AND there is NO swelling AND NO thermal sensitivity.
+*   **Tier 5: General Fallback (Target: `"general_checkup"` etc.)**
+    If the clinical feature flags didn't trigger any of the strict rules above, it falls back to a simple keyword search on the symptom description (e.g., "root canal" -> "root_canal", "clean" -> "general_checkup"). If absolutely nothing matches, it defaults to `"general_checkup"` with the reasoning "Routine follow-up".
+
+**The Output:**
+The function returns two things:
+1. The **`condition_key`** (e.g., `"root_canal"`). This key is then used by the next step to look up real procedures and doctors in the PostgreSQL database.
+2. A list of **triggers** (e.g., `["Severe pain", "Thermal sensitivity"]`). These strings are passed all the way to the frontend so the system has an audit trail explaining exactly why the deterministic engine made that routing decision.
 
 ## 5. Procedure Resolution ([orchestration_engine.py](file:///home/ubuntu/bronn-dev/backend/core/orchestration_engine.py))
 The engine maps the generated `condition_key` to a real DB `Procedure` record ([_resolve_procedure](file:///home/ubuntu/bronn-dev/backend/core/orchestration_engine.py#266-293)), taking tenant scoping into account. For instance, `root_canal` might resolve to the "Endodontic Evaluation (Microscope)" procedure, which dictate base duration and anesthetist requirements.
