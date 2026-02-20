@@ -132,12 +132,26 @@ export async function listPatients() {
 
 // ── Triage ──────────────────────────────────────────────────────────────────
 export async function analyzeSymptoms(
-    symptoms: string,
+    symptomsOrPayload: string | {
+        symptoms?: string | null;
+        user_input?: string | null;
+        structured_data?: Record<string, unknown> | null;
+        history?: { role: "user" | "assistant"; content: string }[] | null;
+    },
     history?: { role: "user" | "assistant"; content: string }[]
 ) {
+    const body = typeof symptomsOrPayload === "string"
+        ? { symptoms: symptomsOrPayload, history: history || null }
+        : {
+            symptoms: symptomsOrPayload.symptoms ?? symptomsOrPayload.user_input ?? "",
+            user_input: symptomsOrPayload.user_input ?? null,
+            structured_data: symptomsOrPayload.structured_data ?? null,
+            history: symptomsOrPayload.history ?? history ?? null,
+        };
+
     return fetchAPI("/api/triage/analyze", {
         method: "POST",
-        body: JSON.stringify({ symptoms, history: history || null }),
+        body: JSON.stringify(body),
     });
 }
 

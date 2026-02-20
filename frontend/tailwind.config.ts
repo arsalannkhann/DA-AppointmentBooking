@@ -9,6 +9,17 @@ const config: Config = {
     theme: {
         extend: {
             colors: {
+                primary: "#1392ec",
+                "primary-content": "#ffffff",
+                "primary-dark": "#0b6cb3",
+                "primary-light": "#e0f2fe",
+                "background-light": "#f6f7f8",
+                "background-dark": "#101a22",
+                "surface-light": "#ffffff",
+                "surface-dark": "#1c2a35",
+                "text-main": "#1e293b",
+                "text-secondary": "#64748b",
+                "border-subtle": "#e2e8f0",
                 brand: {
                     primary: "var(--bg-primary)",
                     secondary: "var(--bg-secondary)",
@@ -41,6 +52,8 @@ const config: Config = {
                 "brand-xl": "var(--radius-xl)",
             },
             boxShadow: {
+                'soft': '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02)',
+                'floating': '0 10px 40px -10px rgba(0, 0, 0, 0.08)',
                 "brand-sm": "var(--shadow-sm)",
                 "brand-md": "var(--shadow-md)",
                 "brand-lg": "var(--shadow-lg)",

@@ -82,3 +82,76 @@ flowchart TD
     Plan --> APIPlan["Action: ORCHESTRATE"]
     APIPlan -->|"Based on symptoms, here are slots..."| Patient
 ```
+
+---
+
+## Example Scenario: Multi-Condition Triage
+
+**Patient Input:**
+> *"Hi, I have severe pain in my upper right tooth, especially at night and with hot or cold drinks. I also have an impacted wisdom tooth that swells sometimes."*
+
+Here is exactly how the backend architecture processes that message:
+
+### 1. The Intent Analyzer (LLM Extraction)
+Because the system supports **Multi-Condition** triage, the LLM will identify two distinct issues and extract structured **boolean feature flags**. It outputs JSON similar to:
+```json
+{
+  "issues": [
+    {
+      "symptom_cluster": "severe pain in upper right tooth at night and with temperature",
+      "urgency": "HIGH",
+      "has_pain": true,
+      "severity": 8,
+      "thermal_sensitivity": true,
+      "location": "upper right",
+      "reported_symptoms": ["night pain", "hot/cold sensitivity"]
+    },
+    {
+      "symptom_cluster": "impacted wisdom tooth with occasional swelling",
+      "urgency": "MEDIUM",
+      "swelling": true,
+      "impacted_wisdom": true,
+      "reported_symptoms": ["swelling", "impacted"]
+    }
+  ],
+  "patient_sentiment": "Anxious"
+}
+```
+
+### 2. The Clinical Gate (Quality Control)
+Before ANY routing happens, the `OrchestrationEngine` passes these issues to the **Clinical Gate** to verify if the medical profile is complete for a referral.
+
+*   **Evaluating Issue 1 (The Toothache):** The Gate infers an Endodontic domain because of the `thermal_sensitivity` and "night pain". It checks the Endo Completeness Profile. We know the *location* (upper right), the *stimulus* (hot/cold), and the *chronobiology* (at night). **Result:** Complete.
+*   **Evaluating Issue 2 (The Wisdom Tooth):** The Gate infers a Surgical domain. The Surgical Profile strictly requires knowing the `swelling_location` (Inside only? Visible outside?). **Result:** Incomplete.
+
+**The Gate's Decision:** Because Issue 2 is missing critical safety data, the Gate interrupts the scheduling flow. The API returns the action **`CLARIFY`** along with a generated question: *"Is the swelling confined strictly to the gums inside your mouth, or is it visibly expanding on the outside of your face, jaw, or neck?"*
+
+### 3. State Merging
+The user replies: *"Just on the gums inside."*
+The Intent Analyzer receives this short message, looks at the active chat history, and uses a state-merging function (`_merge_with_previous_issues`) to apply this new `swelling_location` answer perfectly into Issue #2 without "forgetting" about Issue #1. 
+The Clinical Gate runs again, and this time, both profiles pass 100%. The Gate opens, and the action changes to **`ROUTE`**.
+
+### 4. Clinical Rules Classification (Deterministic Matrix)
+The `Orchestration Engine` takes over to deterministically figure out the required medical procedure based on the feature flags, bypassing LLM hallucination.
+*   **Issue 1:** Hits Tier 2 (Endodontic Rules). Because `has_pain=True`, severity is "severe", and `thermal_sensitivity=True`, it instantly returns the `condition_key` **`root_canal`**.
+*   **Issue 2:** Hits Tier 3 (Surgical Rules). Because `swelling=True` and `impacted_wisdom=True`, it returns the `condition_key` **`wisdom_extraction`**.
+
+### 5. Procedure Resolution
+The database layer maps the abstract keys to real, tenant-scoped procedures:
+*   `"root_canal"` -> Maps to `"Endodontic Evaluation"` (requires an **Endodontist**).
+*   `"wisdom_extraction"` -> Maps to `"Oral Surgery Consultation"` (requires an **Oral Surgeon**).
+
+### 6. Scheduling & Combining
+The `Scheduling Engine` constraint solver searches the 15-minute grid.
+*   It searches for contiguous blocks where an Endodontist is available.
+*   It searches for blocks where an Oral Surgeon is available.
+*   **The Magic:** The `OrchestrationPlan.combined_visit_possible` logic scans the results to see if both doctors work at the same `clinic_id` on the same day. It attempts to find overlapping contiguous blocks so the patient can have their toothache evaluated and their wisdom tooth examined back-to-back in a **single visit**.
+
+### 7. Final Output
+The system generates a safe, physician-forward referral text and packages up the FHIR bundle. The user receives a localized response summarizing the plan:
+
+> *"Based on the information provided, I've identified **2 concerns** that warrant specialist evaluation:*
+> *1. **Severe pain in upper right tooth** → Evaluation by **Endodontist***
+> *2. **Impacted wisdom tooth with swelling** → Evaluation by **Oral Surgeon***
+> 
+> *✨ Good news — we may be able to schedule these evaluations during a **single visit**."*

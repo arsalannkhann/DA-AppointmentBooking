@@ -27,7 +27,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL, "http://13.203.166.158:3000", "https://bronn.dev", "http://localhost:3000", "http://localhost:3001"],
+    allow_origins=[FRONTEND_URL, "http://13.203.166.158", "http://13.203.166.158:3000", "https://bronn.dev", "http://bronn.dev", "http://localhost:3000", "http://localhost:3001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -1,1128 +1,861 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import {
     AlertTriangle,
-    ChevronRight,
-    Clock,
-    Calendar,
     CheckCircle2,
     Shield,
-    Activity,
-    User,
+    RotateCcw,
+    Phone,
+    MapPin,
+    Send,
+    Loader2,
+    Bot,
+    Paperclip,
+    Mic,
+    ArrowUp
 } from "lucide-react";
 import DashboardLayout from "@/components/DashboardLayout";
-import { analyzeSymptoms, searchSlotsBySpecialist, bookAppointment } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { ClarificationPanel } from "@/components/DynamicClarification";
+import { analyzeSymptoms } from "@/lib/api";
 
-// ── Types ────────────────────────────────────────────────────────────────────
+type ClarificationFieldType = "text" | "select" | "multiselect" | "slider" | "boolean" | "textarea";
+type ClarificationValue = string | number | string[];
 
-interface ClinicalIssue {
-    symptom_cluster: string;
-    has_pain: boolean;
-    severity?: number;
-    duration_days?: number;
-    swelling: boolean;
-    airway_compromise: boolean;
-    location?: string;
-    thermal_sensitivity: boolean;
-    biting_pain: boolean;
-    trauma: boolean;
-    bleeding: boolean;
-    impacted_wisdom: boolean;
-}
-
-interface RoutedIssue {
-    specialist_type: string;
-    urgency: string;
-    requires_sedation: boolean;
-    description: string;
-    symptoms: string[];
-    reasoning_triggers: string[]; // Added for reasoning traceability
-    // Constraint-aware fields
-    procedure_id: number | null;
-    procedure_name: string;
-    appointment_type: string;
-    duration_minutes: number;
-    consult_minutes: number;
-    room_capability: Record<string, boolean> | null;
-    requires_anesthetist: boolean;
-    slots: {
-        tier: number;
-        tier_label: string;
-        combo_slots: SlotData[];
-        single_slots: SlotData[];
-        total_found: number;
-        note?: string;
-    } | null;
-    fallback_tier: number;
-    fallback_note: string | null;
-    error: string | null;
-}
-
-interface OrchestrationData {
-    is_emergency: boolean;
-    overall_urgency: string;
-    routed_issues: RoutedIssue[];
-    issues?: ClinicalIssue[]; // Added for CLARIFY state
-    suggested_action: string;
-    combined_visit_possible: boolean;
-    patient_sentiment: string;
-    clarification_questions: string[];
-    emergency_slots?: Record<string, unknown>;
-    message?: string;
-}
-
-interface SlotData {
-    date: string;
-    time: string;
-    end_time: string;
-    doctor_name: string;
-    doctor_id: string;
-    room_name: string;
-    clinic_name: string;
-    procedure: string;
-    type: string;
-    duration_minutes: number;
-    score: number;
-}
-
-
-interface MissingField {
+interface ClarificationField {
     field_key: string;
     label: string;
-    type: "text" | "select" | "slider" | "boolean";
-    required: boolean;
+    type: ClarificationFieldType;
     options?: string[];
+    required: boolean;
     min?: number;
     max?: number;
 }
 
-interface ClarifyIssue {
-    issue_id: string;
-    summary: string;
-    missing_fields: MissingField[];
+interface RoutedIssue {
+    issue_index: number;
+    symptom_cluster: string;
+    urgency: string;
+    specialist_type: string;
+    appointment_type: string;
+    requires_sedation: boolean;
+    procedure_id?: number | null;
+    procedure_name?: string;
 }
 
-type IntakePhase = "INPUT" | "CLARIFY" | "RESULTS" | "SLOTS" | "CONFIRM" | "BOOKED";
-
-// ── Constants ────────────────────────────────────────────────────────────────
-
-const DURATION_OPTIONS = [
-    { value: "less than 24 hours", label: "Less than 24 hours" },
-    { value: "1-3 days", label: "1–3 days" },
-    { value: "4-7 days", label: "4–7 days" },
-    { value: "1-2 weeks", label: "1–2 weeks" },
-    { value: "more than 2 weeks", label: "More than 2 weeks" },
-];
-
-const STEP_MAP: Record<IntakePhase, { step: number; label: string }> = {
-    INPUT: { step: 1, label: "Describe Concern" },
-    CLARIFY: { step: 2, label: "Clinical Clarification" },
-    RESULTS: { step: 3, label: "Specialist Routing" },
-    SLOTS: { step: 3, label: "Appointment Selection" },
-    CONFIRM: { step: 3, label: "Confirm Appointment" },
-    BOOKED: { step: 3, label: "Complete" },
-};
-
-const MAX_CHARS = 1000;
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-function urgencyColor(u: string): string {
-    switch (u.toUpperCase()) {
-        case "EMERGENCY": case "HIGH": return "var(--clinical-urgent)";
-        case "MEDIUM": return "var(--clinical-warning)";
-        case "LOW": return "var(--clinical-safe)";
-        default: return "var(--clinical-info)";
-    }
+interface Message {
+    id: string;
+    role: "bot" | "user";
+    content: string;
+    timestamp: Date;
+    isEmergency?: boolean;
+    clarification_fields?: ClarificationField[];
+    field_submission?: Record<string, ClarificationValue>;
+    suggested_action?: "CLARIFY" | "ROUTE" | "ESCALATE" | "GREETING" | "SMALL_TALK" | "ORCHESTRATE";
+    routed_issues?: RoutedIssue[];
 }
 
-function urgencyLabel(u: string): string {
-    switch (u.toUpperCase()) {
-        case "EMERGENCY": return "Immediate Clinical Attention Required";
-        case "HIGH": return "High Priority";
-        case "MEDIUM": return "Medium Priority";
-        case "LOW": return "Routine";
-        default: return u;
-    }
+interface TriageResponse {
+    message: string;
+    suggested_action: "CLARIFY" | "ROUTE" | "ESCALATE" | "GREETING" | "SMALL_TALK" | "ORCHESTRATE";
+    clarification_questions?: string[];
+    clarification_fields?: ClarificationField[];
+    routed_issues?: RoutedIssue[];
+    emergency_slot?: unknown;
+    overall_urgency?: string;
+    allow_free_text_with_clarification?: boolean;
+    issues?: unknown[]; // Full clinical state from backend
+    clarification?: {
+        issues?: Array<{
+            issue_id: string;
+            summary: string;
+            missing_fields: ClarificationField[];
+            status?: string;
+            missing_elements?: string[];
+        }>;
+        mode?: string;
+    };
 }
 
-// Map backend duration days to frontend dropdown
-function mapDurationToOption(days?: number): string {
-    if (days === undefined || days === null) return "";
-    if (days < 1) return "less than 24 hours";
-    if (days <= 3) return "1-3 days";
-    if (days <= 7) return "4-7 days";
-    if (days <= 14) return "1-2 weeks";
-    return "more than 2 weeks";
+function flattenClarificationFieldsFromPayload(data: TriageResponse): ClarificationField[] | undefined {
+    const issues = data.clarification?.issues || [];
+    if (!issues.length) return undefined;
+
+    const dedupedByKey = new Map<string, ClarificationField>();
+    issues.forEach((issue, issueIndex) => {
+        (issue.missing_fields || []).forEach((field, fieldIndex) => {
+            const baseKey = field.field_key || `field_${issueIndex + 1}_${fieldIndex + 1}`;
+            const key = dedupedByKey.has(baseKey) ? `${baseKey}_${issueIndex + 1}` : baseKey;
+            dedupedByKey.set(key, { ...field, field_key: key });
+        });
+    });
+
+    return Array.from(dedupedByKey.values());
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
+function getClarificationSignature(fields?: ClarificationField[]): string {
+    if (!fields?.length) return "";
+    return fields.map((field) => field.field_key).sort().join("|");
+}
 
-export default function ClinicalIntakePage() {
-    const { user } = useAuth();
+function formatFieldValue(value: ClarificationValue | undefined): string {
+    if (Array.isArray(value)) return value.join(", ");
+    if (typeof value === "number") return `${value}`;
+    return value || "Not provided";
+}
+
+function isFieldFilled(field: ClarificationField, value: ClarificationValue | undefined): boolean {
+    if (!field.required) return true;
+    if (value === undefined || value === null) return false;
+    if (typeof value === "string") return value.trim().length > 0;
+    if (Array.isArray(value)) return value.length > 0;
+    return true;
+}
+
+function buildHistory(messages: Message[]): { role: "assistant" | "user"; content: string }[] {
+    return messages.map((message) => ({
+        role: message.role === "bot" ? "assistant" : "user",
+        content: message.content,
+    }));
+}
+
+function cleanAssistantContent(content: string): string {
+    return content
+        .replace(/\*\*(.*?)\*\*/g, "$1")
+        .replace(/\*(.*?)\*/g, "$1");
+}
+
+function summarizeClarificationContent(content: string): string {
+    const stripped = cleanAssistantContent(content)
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line && !line.startsWith("•"))
+        .join("\n")
+        .trim();
+    return stripped || "Please complete the required fields below.";
+}
+
+export default function ClinicalIntakeChat() {
+    const router = useRouter();
+    const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth();
     const role = (user?.role as "patient" | "admin") || "patient";
 
-    // Core State
-    const [phase, setPhase] = useState<IntakePhase>("INPUT");
-    const [symptomText, setSymptomText] = useState("");
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [orchestration, setOrchestration] = useState<OrchestrationData | null>(null);
-    const [systemMessage, setSystemMessage] = useState<string | null>(null);
+    const [messages, setMessages] = useState<Message[]>([
+        {
+            id: "bot-init",
+            role: "bot",
+            content: "Welcome to SmartDental Clinical Intake. I'm here to help you get the right care. Please describe your symptoms or concern in your own words.",
+            timestamp: new Date(),
+        },
+    ]);
+    const [input, setInput] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
+    const [isTyping, setIsTyping] = useState(false);
+    const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
+    const [activeAction, setActiveAction] = useState<string>("");
 
-    // Clarification State
-    const [clarificationQuestions, setClarificationQuestions] = useState<string[]>([]);
-    const [clarificationAnswers, setClarificationAnswers] = useState<Record<string, string>>({});
-    const [painSeverity, setPainSeverity] = useState(5);
-    const [duration, setDuration] = useState("");
-    const [breathingDifficulty, setBreathingDifficulty] = useState<boolean | null>(null);
-    const [locationInput, setLocationInput] = useState("");
-    const [parsedIssues, setParsedIssues] = useState<ClinicalIssue[]>([]);
-    const [clarificationIssues, setClarificationIssues] = useState<ClarifyIssue[] | null>(null);
+    const [activeClarificationFields, setActiveClarificationFields] = useState<ClarificationField[] | null>(null);
+    const [pendingStructuredData, setPendingStructuredData] = useState<Record<string, ClarificationValue>>({});
+    const [activeClarificationSignature, setActiveClarificationSignature] = useState<string | null>(null);
+    const [lastClarificationSignature, setLastClarificationSignature] = useState<string | null>(null);
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+    const [allowFreeTextDuringClarification, setAllowFreeTextDuringClarification] = useState(false);
 
-    // Booking State
-    const [conversationContext, setConversationContext] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
-    const [slots, setSlots] = useState<SlotData[]>([]);
-    const [selectedSlot, setSelectedSlot] = useState<SlotData | null>(null);
-    const [bookingNotes, setBookingNotes] = useState("");
-    const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+    // Store the full clinical state (issues) returned by the backend
+    const [clinicalState, setClinicalState] = useState<{ issues: unknown[] } | null>(null);
 
-    const scrollRef = useRef<HTMLDivElement>(null);
+    const lastStructuredSubmissionSignatureRef = useRef<string | null>(null);
+
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }, [phase, orchestration, slots]);
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [messages, isTyping, suggestedQuestions]);
 
-    const updateTimestamp = () => {
-        setLastUpdated(new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }));
-    };
+    const applyResponse = useCallback((data: TriageResponse) => {
+        const structuredFieldsFromPayload = flattenClarificationFieldsFromPayload(data);
+        const incomingFields = structuredFieldsFromPayload && structuredFieldsFromPayload.length > 0
+            ? structuredFieldsFromPayload
+            : data.clarification_fields && data.clarification_fields.length > 0
+                ? data.clarification_fields
+                : undefined;
+        const incomingSignature = getClarificationSignature(incomingFields);
+        const repeatedAfterStructuredSubmit = Boolean(
+            incomingSignature &&
+            incomingSignature === lastClarificationSignature &&
+            incomingSignature === lastStructuredSubmissionSignatureRef.current
+        );
 
-    // ── Submit Initial Symptoms ──────────────────────────────────────────────
-    const handleAnalyze = async () => {
-        if (!symptomText.trim() || loading) return;
-        setLoading(true);
-        setError(null);
-        setSystemMessage(null);
+        if (repeatedAfterStructuredSubmit) {
+            const fallbackMessage: Message = {
+                id: `bot-loop-guard-${Date.now()}`,
+                role: "bot",
+                content: "Thank you. Processing your information.",
+                timestamp: new Date(),
+                suggested_action: data.suggested_action,
+                isEmergency: data.suggested_action === "ESCALATE",
+                routed_issues: data.routed_issues || [],
+            };
 
-        const userEntry = { role: "user" as const, content: symptomText };
-        const newContext = [...conversationContext, userEntry];
-        setConversationContext(newContext);
+            setMessages((prev) => [...prev, fallbackMessage]);
+            setSuggestedQuestions([]);
+            setActiveAction(data.suggested_action);
+            setActiveClarificationFields(null);
+            setPendingStructuredData({});
+            setFieldErrors({});
+            setActiveClarificationSignature(null);
+            setAllowFreeTextDuringClarification(false);
 
-        try {
-            const res = await analyzeSymptoms(symptomText, newContext);
-            const action = res.suggested_action || res.action || "CLARIFY";
-            const assistantEntry = { role: "assistant" as const, content: res.message || "" };
-            setConversationContext([...newContext, assistantEntry]);
-            updateTimestamp();
-
-            if (action === "ESCALATE") {
-                setOrchestration(res);
-                setSystemMessage(res.message);
-                setPhase("RESULTS");
-                if (res.emergency_slot) {
-                    setSelectedSlot(res.emergency_slot as unknown as SlotData);
-                    setPhase("CONFIRM");
-                }
-            } else if (action === "GREETING" || action === "SMALL_TALK" || action === "GREET") {
-                setSystemMessage(res.message);
-            } else if (action === "CLARIFY") {
-                // Enterprise UX: Smart Prefill & Dynamic Form
-                const issues = res.issues || [];
-                setParsedIssues(issues);
-
-                // Phase 2: Dynamic Clarification Interface
-                if (res.clarification && res.clarification.issues) {
-                    setClarificationIssues(res.clarification.issues);
-                } else {
-                    setClarificationIssues(null);
-                }
-
-                // Legacy Prefill (Keep for now, but UI will prefer Dynamic Panel)
-                const primary = issues[0];
-                if (primary) {
-                    if (primary.severity) setPainSeverity(primary.severity);
-                    if (primary.location) setLocationInput(primary.location);
-                    if (primary.duration_days !== undefined && primary.duration_days !== null) {
-                        setDuration(mapDurationToOption(primary.duration_days));
-                    }
-                    if (primary.airway_compromise) setBreathingDifficulty(true);
-                }
-
-                setClarificationQuestions(res.clarification_questions || []);
-                setSystemMessage(res.message);
-                setPhase("CLARIFY");
-            } else if (action === "ORCHESTRATE") {
-                setOrchestration(res);
-                setSystemMessage(res.message);
-                setPhase("RESULTS");
-                await searchSlotsForIssues(res);
-            } else {
-                setSystemMessage(res.message || "Please provide more detail about your concern.");
+            // Update clinical state so we don't lose context
+            if (data.issues) {
+                setClinicalState({ issues: data.issues });
             }
-        } catch {
-            setError("We were unable to process the information provided. Please refine your description with more clinical details such as location, duration, and severity.");
-        } finally {
-            setLoading(false);
+            return;
         }
-    };
 
-    // ── Submit Clarification ─────────────────────────────────────────────────
-    const handleClarificationSubmit = async (dynamicData?: Record<string, any>) => {
-        if (loading) return;
-        setLoading(true);
-        setError(null);
+        const botMessage: Message = {
+            id: `bot-${Date.now()}`,
+            role: "bot",
+            content: data.message,
+            timestamp: new Date(),
+            suggested_action: data.suggested_action,
+            isEmergency: data.suggested_action === "ESCALATE",
+            clarification_fields: incomingFields,
+            routed_issues: data.routed_issues || [],
+        };
 
-        let responseText = "";
+        setMessages((prev) => [...prev, botMessage]);
+        setSuggestedQuestions(
+            data.suggested_action === "CLARIFY" && (!incomingFields || incomingFields.length === 0)
+                ? (data.clarification_questions || [])
+                : []
+        );
+        setActiveAction(data.suggested_action);
 
-        if (dynamicData && clarificationIssues) {
-            // Enterprise UX: Convert structured form data to natural language for the LLM
-            const parts: string[] = [];
-            clarificationIssues.forEach(issue => {
-                issue.missing_fields.forEach(field => {
-                    const key = `${issue.issue_id}_${field.field_key}`;
-                    const val = dynamicData[key];
-                    if (val !== undefined && val !== null && val !== "") {
-                        if (field.type === "boolean") {
-                            parts.push(`${field.label}: ${val ? "Yes" : "No"}`);
-                        } else {
-                            parts.push(`${field.label}: ${val}`);
-                        }
-                    }
-                });
-            });
-            responseText = parts.join(". ");
+        // Update clinical state
+        if (data.issues) {
+            setClinicalState({ issues: data.issues });
+        }
+
+        if (incomingFields?.length) {
+            setActiveClarificationFields(incomingFields);
+            setPendingStructuredData({});
+            setFieldErrors({});
+            setActiveClarificationSignature(incomingSignature);
+            setLastClarificationSignature(incomingSignature);
+            setAllowFreeTextDuringClarification(Boolean(data.allow_free_text_with_clarification));
         } else {
-            // Fallback to text input
-            responseText = symptomText;
+            setActiveClarificationFields(null);
+            setPendingStructuredData({});
+            setFieldErrors({});
+            setActiveClarificationSignature(null);
+            setAllowFreeTextDuringClarification(false);
         }
+    }, [lastClarificationSignature]);
 
-        if (!responseText.trim()) {
-            setLoading(false);
+    const sendTextMessage = useCallback(async (text: string) => {
+        const trimmed = text.trim();
+        if (!trimmed) return;
+        if (isAuthLoading || !isAuthenticated) {
+            setMessages((prev) => [
+                ...prev,
+                {
+                    id: `bot-auth-required-${Date.now()}`,
+                    role: "bot",
+                    content: "Please sign in before using clinical triage.",
+                    timestamp: new Date(),
+                    isEmergency: false,
+                },
+            ]);
             return;
         }
 
-        const userEntry = { role: "user" as const, content: responseText };
-        const newContext = [...conversationContext, userEntry];
-        setConversationContext(newContext);
-        setSymptomText(""); // Clear input
+        const userMessage: Message = {
+            id: `user-${Date.now()}`,
+            role: "user",
+            content: trimmed,
+            timestamp: new Date(),
+        };
+
+        const nextMessages = [...messages, userMessage];
+        setMessages(nextMessages);
+        setInput("");
+        setSuggestedQuestions([]);
+        setIsLoading(true);
+        setIsTyping(true);
 
         try {
-            const res = await analyzeSymptoms(responseText, newContext);
-            const action = res.suggested_action || res.action || "CLARIFY";
-            const assistantEntry = { role: "assistant" as const, content: res.message || "" };
-            setConversationContext([...newContext, assistantEntry]);
-            updateTimestamp();
+            const data: TriageResponse = await analyzeSymptoms({
+                symptoms: trimmed,
+                user_input: trimmed,
+                structured_data: clinicalState, // Pass current clinical state
+                history: buildHistory(nextMessages),
+            });
 
-            if (action === "ESCALATE") {
-                setOrchestration(res);
-                setSystemMessage(res.message);
-                setPhase("RESULTS");
-                if (res.emergency_slot) {
-                    setSelectedSlot(res.emergency_slot as unknown as SlotData);
-                    setPhase("CONFIRM");
+            setTimeout(() => {
+                applyResponse(data);
+                setIsLoading(false);
+                setIsTyping(false);
+
+                if (
+                    data.suggested_action === "CLARIFY" ||
+                    data.suggested_action === "GREETING" ||
+                    data.suggested_action === "SMALL_TALK"
+                ) {
+                    setTimeout(() => inputRef.current?.focus(), 100);
                 }
-            } else if (action === "GREETING" || action === "SMALL_TALK" || action === "GREET") {
-                setSystemMessage(res.message);
-            } else if (action === "CLARIFY") {
-                const issues = res.issues || [];
-                setParsedIssues(issues);
+            }, 450);
+        } catch (error) {
+            console.error("API Error:", error);
+            setIsLoading(false);
+            setIsTyping(false);
 
-                if (res.clarification && res.clarification.issues) {
-                    setClarificationIssues(res.clarification.issues);
-                } else {
-                    setClarificationIssues(null);
-                }
+            const errMsg = error instanceof Error ? error.message : "Unknown error";
+            setMessages((prev) => [
+                ...prev,
+                {
+                    id: `bot-err-${Date.now()}`,
+                    role: "bot",
+                    content: errMsg.includes("401") || errMsg.includes("Unauthorized")
+                        ? "Your session has expired. Please log in again."
+                        : "I apologize, but I'm having trouble connecting to the clinical engine right now. Please try again or call our office.",
+                    timestamp: new Date(),
+                    isEmergency: false,
+                },
+            ]);
+        }
+    }, [messages, applyResponse, isAuthenticated, isAuthLoading, clinicalState]);
 
-                setClarificationQuestions(res.clarification_questions || []);
-                setSystemMessage(res.message);
-                setPhase("CLARIFY");
-            } else if (action === "ORCHESTRATE") {
-                setOrchestration(res);
-                setSystemMessage(res.message);
-                setPhase("RESULTS");
-                await searchSlotsForIssues(res);
-            } else {
-                setSystemMessage(res.message || "Please provide more detail about your concern.");
+    const handleInputSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        sendTextMessage(input);
+    };
+
+    const handleSuggestionClick = (question: string) => {
+        sendTextMessage(question);
+    };
+
+    const handleViewSlots = useCallback((issues?: RoutedIssue[]) => {
+        if (issues?.length) {
+            try {
+                sessionStorage.setItem("triageRoutedIssues", JSON.stringify(issues));
+            } catch {
+                // Ignore storage failures and continue navigation
             }
-        } catch {
-            setError("We were unable to process your response. Please try again.");
-        } finally {
-            setLoading(false);
+        }
+        if (role === "patient") {
+            router.push("/patient/book");
+            return;
+        }
+        router.push("/admin/appointments");
+    }, [role, router]);
+
+    const handleStructuredFieldChange = (field: ClarificationField, value: ClarificationValue) => {
+        setPendingStructuredData((prev) => ({
+            ...prev,
+            [field.field_key]: value,
+        }));
+
+        if (fieldErrors[field.field_key]) {
+            setFieldErrors((prev) => {
+                const updated = { ...prev };
+                delete updated[field.field_key];
+                return updated;
+            });
         }
     };
 
-    // ── Slot Search (uses pre-attached slots from orchestration) ───────────────
-    const searchSlotsForIssues = async (orch: OrchestrationData) => {
-        if (!orch.routed_issues?.length) return;
-
-        // Collect slots from all routed issues (pre-attached by orchestration engine)
-        const allSlots: SlotData[] = [];
-        for (const issue of orch.routed_issues) {
-            if (issue.slots) {
-                allSlots.push(...(issue.slots.combo_slots || []), ...(issue.slots.single_slots || []));
-            }
-        }
-
-        if (allSlots.length > 0) {
-            setSlots(allSlots);
-            setPhase("SLOTS");
+    const handleStructuredSubmit = async () => {
+        if (!activeClarificationFields?.length || isLoading) return;
+        if (isAuthLoading || !isAuthenticated) {
+            setMessages((prev) => [
+                ...prev,
+                {
+                    id: `bot-auth-required-${Date.now()}`,
+                    role: "bot",
+                    content: "Your session is not active. Please sign in and try again.",
+                    timestamp: new Date(),
+                    isEmergency: false,
+                },
+            ]);
             return;
         }
 
-        // Fallback: if orchestration didn't attach slots, search by specialist
-        const primaryIssue = orch.routed_issues.reduce((prev, curr) => {
-            const m: Record<string, number> = { EMERGENCY: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
-            return (m[curr.urgency] || 1) > (m[prev.urgency] || 1) ? curr : prev;
+        const validationErrors: Record<string, string> = {};
+        activeClarificationFields.forEach((field) => {
+            const value = pendingStructuredData[field.field_key];
+            if (!isFieldFilled(field, value)) {
+                validationErrors[field.field_key] = `${field.label} is required`;
+            }
         });
+
+        if (Object.keys(validationErrors).length > 0) {
+            setFieldErrors(validationErrors);
+            return;
+        }
+
+        const submission = activeClarificationFields.reduce<Record<string, ClarificationValue>>((acc, field) => {
+            const value = pendingStructuredData[field.field_key];
+            if (value !== undefined) acc[field.field_key] = value;
+            return acc;
+        }, {});
+
+        const submissionSummary = activeClarificationFields
+            .map((field) => `- ${field.label}: ${formatFieldValue(submission[field.field_key])}`)
+            .join("\n");
+
+        const userSubmissionMessage: Message = {
+            id: `user-structured-${Date.now()}`,
+            role: "user",
+            content: `Submitted clarification:\n${submissionSummary}`,
+            timestamp: new Date(),
+            field_submission: submission,
+        };
+
+        const nextMessages = [...messages, userSubmissionMessage];
+        setMessages(nextMessages);
+
+        lastStructuredSubmissionSignatureRef.current = activeClarificationSignature;
+        setActiveClarificationFields(null);
+        setPendingStructuredData({});
+        setFieldErrors({});
+        setActiveClarificationSignature(null);
+        setAllowFreeTextDuringClarification(false);
+        setSuggestedQuestions([]);
+
+        setIsLoading(true);
+        setIsTyping(true);
+
         try {
-            const slotRes = await searchSlotsBySpecialist(primaryIssue.specialist_type, primaryIssue.requires_sedation);
-            const fallbackSlots = [...(slotRes.combo_slots || []), ...(slotRes.single_slots || [])];
-            if (fallbackSlots.length > 0) {
-                setSlots(fallbackSlots);
-                setPhase("SLOTS");
-            }
-        } catch { /* slot search failed silently */ }
-    };
+            const data: TriageResponse = await analyzeSymptoms({
+                symptoms: "",
+                user_input: null,
+                structured_data: {
+                    issues: clinicalState?.issues || [],
+                    answers: submission,
+                },
+                history: buildHistory(nextMessages),
+            });
 
-    // ── Derived State ────────────────────────────────────────────────────────
-    const isEmergency = orchestration?.is_emergency || breathingDifficulty === true;
-    const triageStatus = orchestration
-        ? (isEmergency
-            ? "Urgent Triage"
-            : (orchestration.routed_issues.some(i => i.procedure_id != null) ? "Specialist Evaluation Identified" : "Review Required"))
-        : "Pending";
-    const bookingBlocked = isEmergency || triageStatus === "Pending";
+            setTimeout(() => {
+                applyResponse(data);
+                setIsLoading(false);
+                setIsTyping(false);
+            }, 450);
+        } catch (error) {
+            console.error("Structured API Error:", error);
+            setIsLoading(false);
+            setIsTyping(false);
 
-    // ── Booking ──────────────────────────────────────────────────────────────────────
-    const handleConfirmBooking = async () => {
-        if (!selectedSlot || loading || bookingBlocked) return;
-        setLoading(true);
-        setError(null);
-
-        // Resolve procedure_id from the primary routed issue
-        const primaryIssue = orchestration?.routed_issues?.find(r => r.procedure_id != null);
-        const procId = primaryIssue?.procedure_id ?? null;
-
-        try {
-            await bookAppointment(user?.user_id || "", procId as unknown as number, { ...selectedSlot, notes: bookingNotes || symptomText });
-            setPhase("BOOKED");
-            updateTimestamp();
-        } catch {
-            setError(
-                isEmergency
-                    ? "Booking paused due to emergency triage. Please contact the clinic directly."
-                    : "We were unable to complete the booking due to a system error. Please try again or contact the clinic."
-            );
-        } finally {
-            setLoading(false);
+            setMessages((prev) => [
+                ...prev,
+                {
+                    id: `bot-structured-err-${Date.now()}`,
+                    role: "bot",
+                    content: "I couldn't process the clarification response. Please try again.",
+                    timestamp: new Date(),
+                    isEmergency: false,
+                },
+            ]);
         }
     };
 
-    const handleNewIntake = () => {
-        setPhase("INPUT");
-        setSymptomText("");
-        setOrchestration(null);
-        setSystemMessage(null);
-        setClarificationQuestions([]);
-        setClarificationAnswers({});
-        setPainSeverity(5);
-        setDuration("");
-        setBreathingDifficulty(null);
-        setLocationInput("");
-        setConversationContext([]);
-        setSlots([]);
-        setSelectedSlot(null);
-        setBookingNotes("");
-        setError(null);
-        setLastUpdated(null);
-    };
+    const handleReset = useCallback(() => {
+        setMessages([]);
+        setTimeout(() => {
+            const initialMessage: Message = {
+                id: "bot-init",
+                role: "bot",
+                content: "Welcome to SmartDental Clinical Intake. I'm here to help you get the right care. Please describe your symptoms or concern in your own words.",
+                timestamp: new Date(),
+            };
+            setMessages([initialMessage]);
+            setInput("");
+            setSuggestedQuestions([]);
+            setActiveAction("");
+            setActiveClarificationFields(null);
+            setPendingStructuredData({});
+            setFieldErrors({});
+            setActiveClarificationSignature(null);
+            setLastClarificationSignature(null);
+            setAllowFreeTextDuringClarification(false);
+            setClinicalState(null);
+            lastStructuredSubmissionSignatureRef.current = null;
+        }, 100);
+    }, []);
 
-    const currentStep = STEP_MAP[phase];
-    const charCount = symptomText.length;
-
-    // ══════════════════════════════════════════════════════════════════════════
-    // RENDER
-    // ══════════════════════════════════════════════════════════════════════════
+    const hasActiveStructuredClarification = Boolean(activeClarificationFields && activeClarificationFields.length > 0);
+    const textInputDisabled = isLoading
+        || isAuthLoading
+        || !isAuthenticated
+        || activeAction === "ESCALATE"
+        || (hasActiveStructuredClarification && !allowFreeTextDuringClarification);
 
     return (
-        <DashboardLayout role={role} title="Clinical Routing Console" subtitle="Constraint-based specialist evaluation and appointment orchestration">
-            <div className="max-w-[1400px] mx-auto">
-                {/* Progress Indicator */}
-                <div className="flex items-center gap-2 sm:gap-4 mb-4 sm:mb-8 px-1">
-                    {[
-                        { n: 1, label: "Clinical Intake" },
-                        { n: 2, label: "Evaluation" },
-                        { n: 3, label: "Scheduling" },
-                    ].map((s, i) => (
-                        <div key={s.n} className="flex items-center gap-2 sm:gap-3">
-                            {i > 0 && (
-                                <div className={`w-6 sm:w-12 h-0.5 transition-colors ${currentStep.step > i ? "bg-cyan-500" : "bg-white/10"}`} />
-                            )}
-                            <div className={`flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full text-xs font-semibold transition-all ${currentStep.step >= s.n ? "bg-cyan-600 text-white" : "bg-white/5 text-brand-text-muted border border-white/10"}`}>
-                                {currentStep.step > s.n ? <CheckCircle2 size={14} /> : s.n}
+        <DashboardLayout
+            role={role}
+            title="Clinical Intake"
+            subtitle="AI-Powered Clinical Triage & Orchestration"
+        >
+            <div className="flex-1 flex flex-col relative h-[calc(100vh-8rem)] bg-background-light rounded-2xl overflow-hidden border border-border-subtle">
+                <header className="glass absolute top-0 w-full z-10 border-b border-border-subtle/50 h-[72px] flex items-center justify-between px-6 transition-colors rounded-t-2xl">
+                    <div className="flex items-center gap-4">
+                        <div>
+                            <div className="flex items-center gap-2 text-xs text-text-secondary mb-0.5">
+                                <span>Patients</span>
+                                <span className="material-symbols-outlined text-[10px] font-bold">&gt;</span>
+                                <span>Active Session</span>
                             </div>
-                            <span className={`text-sm font-medium transition-colors hidden sm:inline ${currentStep.step >= s.n ? "text-white" : "text-brand-text-muted"}`}>
-                                {s.label}
+                            <h2 className="text-lg font-bold text-text-main flex items-center gap-2">
+                                Intake Session
+                                <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-[10px] font-bold uppercase tracking-wide">Live</span>
+                            </h2>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <button className="p-2 text-text-secondary hover:text-primary hover:bg-primary/5 rounded-full transition-colors relative">
+                            <Shield size={20} className={activeAction === "ESCALATE" ? "text-red-500" : ""} />
+                            {activeAction === "ESCALATE" && <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>}
+                        </button>
+                        <div className="h-8 w-px bg-border-subtle mx-1"></div>
+                        <button onClick={handleReset} className="bg-primary hover:bg-primary-dark text-white text-sm font-semibold py-2.5 px-5 rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center gap-2 group">
+                            <RotateCcw size={18} className="group-hover:-rotate-90 transition-transform" />
+                            Restart
+                        </button>
+                    </div>
+                </header>
+
+                <div className="flex-1 overflow-y-auto scrollbar-hide pt-[80px] pb-[100px] px-4 md:px-8">
+                    <div className="max-w-3xl mx-auto flex flex-col gap-6 py-6">
+                        <div className="flex justify-center flex-col items-center gap-2">
+                            <span className="bg-slate-100 text-text-secondary text-xs font-medium px-4 py-1.5 rounded-full">
+                                Today, {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
+                            <div className="p-3 bg-white border border-border-subtle text-center rounded-lg max-w-[90%] shadow-sm">
+                                <p className="text-[10px] text-text-secondary">
+                                    This is a clinical decision support tool. Final diagnosis and treatment planning require evaluation by a licensed medical professional.
+                                </p>
+                            </div>
                         </div>
-                    ))}
-                </div>
 
-                {/* Main Grid Layout */}
-                <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start">
-                    {/* LEFT COLUMN - Primary Workflow */}
-                    <div
-                        ref={scrollRef}
-                        className="flex flex-col gap-5 lg:max-h-[calc(100vh-220px)] lg:overflow-y-auto lg:pr-2 custom-scrollbar"
-                    >
-                        {/* Error Banner */}
-                        {error && (
-                            <div className="border-l-4 border-red-500 bg-red-500/10 rounded-lg p-4">
-                                <p className="text-sm text-red-200 leading-relaxed">{error}</p>
-                            </div>
-                        )}
+                        {messages.map((message) => {
+                            const messageSignature = getClarificationSignature(message.clarification_fields);
+                            const renderStructuredForm = Boolean(
+                                message.clarification_fields?.length &&
+                                message.role === "bot" &&
+                                activeClarificationSignature &&
+                                messageSignature === activeClarificationSignature
+                            );
 
-                        {/* SECTION 1: Symptom Input */}
-                        <div className="card">
-                            <div className="card-header">
-                                <h3 className="card-title">Clinical Intake</h3>
-                                <p className="card-subtitle">Describe your primary concern</p>
-                            </div>
-                            <div className="flex flex-col gap-4">
-                                {phase === "INPUT" && (
-                                    <div className="text-sm text-brand-text-muted leading-relaxed pb-4 border-b border-white/5">
-                                        <p className="font-medium mb-2">Please provide the following information:</p>
-                                        <ul className="space-y-1 ml-4">
-                                            <li>• Location (upper/lower, left/right)</li>
-                                            <li>• Duration (how long symptoms have persisted)</li>
-                                            <li>• Severity (pain level 1-10)</li>
-                                            <li>• Associated symptoms (swelling, bleeding, fever)</li>
-                                        </ul>
-                                    </div>
-                                )}
+                            return (
+                                <motion.div
+                                    key={message.id}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className={`flex gap-4 items-end group ${message.role === "bot" ? "" : "justify-end"}`}
+                                >
+                                    {message.role === "bot" && (
+                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shrink-0 shadow-sm">
+                                            {message.isEmergency ? <AlertTriangle size={16} /> : <Bot size={16} />}
+                                        </div>
+                                    )}
 
-                                <div className="relative">
-                                    <textarea
-                                        value={symptomText}
-                                        onChange={(e) => {
-                                            if (e.target.value.length <= MAX_CHARS) setSymptomText(e.target.value);
-                                        }}
-                                        placeholder="Example: Sharp pain in lower left molar for 3 days. Worsens at night and sensitive to cold. No swelling."
-                                        disabled={loading || (phase !== "INPUT" && phase !== "CLARIFY")}
-                                        onKeyDown={(e) => {
-                                            if (e.key === "Enter" && !e.shiftKey && phase === "INPUT") {
-                                                e.preventDefault();
-                                                handleAnalyze();
-                                            }
-                                        }}
-                                        className="w-full min-h-[120px] resize-vertical p-4 pb-10 text-sm leading-relaxed bg-brand-input border border-white/10 rounded-lg text-white placeholder-brand-text-muted focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all"
-                                    />
-                                    <span className={`absolute bottom-3 right-4 text-xs ${charCount > MAX_CHARS * 0.9 ? "text-amber-400" : "text-brand-text-disabled"}`}>
-                                        {charCount}/{MAX_CHARS}
-                                    </span>
-                                </div>
-
-                                {phase === "INPUT" && (
-                                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
-                                        <button
-                                            onClick={handleAnalyze}
-                                            disabled={!symptomText.trim() || loading}
-                                            className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            {loading ? "Processing..." : "Begin Clinical Review"}
-                                        </button>
-                                        <span className="text-xs text-brand-text-disabled text-center sm:text-left">
-                                            Does not constitute medical advice
+                                    <div className={`flex flex-col gap-1 max-w-[80%] ${message.role === "bot" ? "" : "items-end"}`}>
+                                        <span className={`text-xs font-medium text-text-secondary ${message.role === "bot" ? "ml-1" : "mr-1"}`}>
+                                            {message.role === "bot" ? "HealthAI Bot" : user?.patient_name || user?.clinic_name || "Dr. Smith"}
                                         </span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
 
-                        {/* System Message */}
-                        {systemMessage && phase === "INPUT" && (
-                            <div className="card">
-                                <p className="text-sm text-brand-text-secondary leading-relaxed">
-                                    {systemMessage}
-                                </p>
-                            </div>
-                        )}
+                                        <div className={`${message.role === "bot"
+                                            ? `bg-white p-4 rounded-2xl rounded-bl-sm shadow-soft border border-slate-100 text-text-main leading-relaxed ${message.isEmergency ? "border-red-500 bg-red-50" : ""}`
+                                            : "bg-primary text-white p-4 rounded-2xl rounded-br-sm shadow-md shadow-primary/10 leading-relaxed"
+                                            }`}>
 
-                        {/* SECTION 2: Identified Concerns */}
-                        <AnimatePresence>
-                            {orchestration && orchestration.routed_issues.length > 0 && phase !== "INPUT" && (
-                                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15 }}>
-                                    <div className="card">
-                                        <div className="card-header">
-                                            <h3 className="card-title">Identified Clinical Concerns</h3>
-                                            <p className="card-subtitle">Structured symptom analysis</p>
-                                        </div>
-                                        <div className="flex flex-col gap-3">
-                                            {orchestration.routed_issues.map((issue, i) => (
-                                                <div key={i} className="border-l-4 p-4 bg-brand-input rounded-lg" style={{ borderLeftColor: urgencyColor(issue.urgency) }}>
-                                                    <div className="flex justify-between items-start mb-2">
-                                                        <div>
-                                                            <h4 className="text-sm font-semibold text-white mb-1">
-                                                                Concern {i + 1}: {issue.description}
-                                                            </h4>
-                                                            <p className="text-xs text-brand-text-muted">
-                                                                Specialist: {issue.specialist_type}
-                                                                {issue.requires_sedation && " • Sedation capability available"}
-                                                            </p>
-                                                        </div>
-                                                        <span className="badge text-xs px-2 py-1" style={{
-                                                            backgroundColor: `${urgencyColor(issue.urgency)}20`,
-                                                            color: urgencyColor(issue.urgency),
-                                                            border: `1px solid ${urgencyColor(issue.urgency)}40`,
-                                                            textTransform: "uppercase",
-                                                            letterSpacing: "0.04em",
-                                                        }}>
-                                                            {urgencyLabel(issue.urgency)}
-                                                        </span>
-                                                    </div>
-                                                    {/* Reasoning Traceability Layer */}
-                                                    {issue.reasoning_triggers?.length > 0 && (
-                                                        <div className="mt-3 p-2 bg-brand-card rounded border border-[var(--border-primary)]">
-                                                            <div className="text-[0.6875rem] font-semibold text-brand-text-muted uppercase mb-1">
-                                                                Reason Traceability
+                                            {message.isEmergency && (
+                                                <div className="flex items-center gap-2 text-red-600 font-bold text-sm mb-2">
+                                                    <AlertTriangle size={16} />
+                                                    <span>Emergency Alert</span>
+                                                </div>
+                                            )}
+
+                                            <div className="whitespace-pre-wrap">
+                                                {renderStructuredForm
+                                                    ? summarizeClarificationContent(message.content)
+                                                    : cleanAssistantContent(message.content)}
+                                            </div>
+
+                                            {renderStructuredForm && message.clarification_fields && (
+                                                <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-4 shadow-sm">
+                                                    {message.clarification_fields.map((field) => {
+                                                        const value = pendingStructuredData[field.field_key];
+                                                        const error = fieldErrors[field.field_key];
+
+                                                        return (
+                                                            <div key={field.field_key} className="space-y-2">
+                                                                <label className="block text-sm font-medium text-slate-700">
+                                                                    {field.label}
+                                                                    {field.required && <span className="text-red-500 ml-1">*</span>}
+                                                                </label>
+
+                                                                {field.type === "text" && (
+                                                                    <input
+                                                                        type="text"
+                                                                        value={typeof value === "string" ? value : ""}
+                                                                        onChange={(e) => handleStructuredFieldChange(field, e.target.value)}
+                                                                        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary focus:outline-none"
+                                                                        placeholder={`Enter ${field.label.toLowerCase()}`}
+                                                                    />
+                                                                )}
+
+                                                                {field.type === "textarea" && (
+                                                                    <textarea
+                                                                        value={typeof value === "string" ? value : ""}
+                                                                        onChange={(e) => handleStructuredFieldChange(field, e.target.value)}
+                                                                        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary focus:outline-none min-h-[88px]"
+                                                                        placeholder={`Enter ${field.label.toLowerCase()}`}
+                                                                    />
+                                                                )}
+
+                                                                {field.type === "select" && (
+                                                                    <select
+                                                                        value={typeof value === "string" ? value : ""}
+                                                                        onChange={(e) => handleStructuredFieldChange(field, e.target.value)}
+                                                                        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary focus:outline-none"
+                                                                    >
+                                                                        <option value="">Select an option</option>
+                                                                        {(field.options || []).map((option) => (
+                                                                            <option key={option} value={option}>
+                                                                                {option}
+                                                                            </option>
+                                                                        ))}
+                                                                    </select>
+                                                                )}
+
+                                                                {field.type === "boolean" && (
+                                                                    <div className="flex gap-2">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleStructuredFieldChange(field, "Yes")}
+                                                                            className={`px-3 py-1.5 rounded-md text-xs border font-medium ${value === "Yes"
+                                                                                ? "bg-primary text-white border-primary"
+                                                                                : "bg-white text-slate-700 border-slate-300 hover:border-primary transition-colors"
+                                                                                }`}
+                                                                        >
+                                                                            Yes
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleStructuredFieldChange(field, "No")}
+                                                                            className={`px-3 py-1.5 rounded-md text-xs border font-medium ${value === "No"
+                                                                                ? "bg-primary text-white border-primary"
+                                                                                : "bg-white text-slate-700 border-slate-300 hover:border-primary transition-colors"
+                                                                                }`}
+                                                                        >
+                                                                            No
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+
+                                                                {field.type === "multiselect" && (
+                                                                    <div className="flex flex-wrap gap-2">
+                                                                        {(field.options || []).map((option) => {
+                                                                            const selectedValues = Array.isArray(value) ? value : [];
+                                                                            const isSelected = selectedValues.includes(option);
+                                                                            return (
+                                                                                <button
+                                                                                    key={option}
+                                                                                    type="button"
+                                                                                    onClick={() => {
+                                                                                        const nextValues = isSelected
+                                                                                            ? selectedValues.filter((item) => item !== option)
+                                                                                            : [...selectedValues, option];
+                                                                                        handleStructuredFieldChange(field, nextValues);
+                                                                                    }}
+                                                                                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${isSelected
+                                                                                        ? "bg-primary text-white border-primary"
+                                                                                        : "bg-white text-slate-700 border-slate-300 hover:border-primary"
+                                                                                        }`}
+                                                                                >
+                                                                                    {option}
+                                                                                </button>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                )}
+
+                                                                {field.type === "slider" && (
+                                                                    <div className="space-y-2">
+                                                                        <input
+                                                                            type="range"
+                                                                            min={field.min ?? 1}
+                                                                            max={field.max ?? 10}
+                                                                            value={typeof value === "number" ? value : field.min ?? 1}
+                                                                            onChange={(e) => handleStructuredFieldChange(field, Number(e.target.value))}
+                                                                            className="w-full accent-primary"
+                                                                        />
+                                                                        <div className="text-xs text-slate-500 font-medium text-center">
+                                                                            Value: {typeof value === "number" ? value : field.min ?? 1}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+
+                                                                {error && (
+                                                                    <p className="text-xs text-red-600 font-medium">{error}</p>
+                                                                )}
                                                             </div>
-                                                            <div className="flex flex-wrap gap-1.5">
-                                                                {issue.reasoning_triggers.map((t, ti) => (
-                                                                    <span key={ti} className="text-xs text-cyan-400 flex items-center gap-1">
-                                                                        <CheckCircle2 size={10} /> {t}
-                                                                    </span>
-                                                                ))}
+                                                        );
+                                                    })}
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleStructuredSubmit}
+                                                        disabled={isLoading}
+                                                        className="w-full rounded-xl bg-primary shadow-sm shadow-primary/20 text-white py-3 text-sm font-semibold tracking-wide hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                                    >
+                                                        Submit Response
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {message.routed_issues && message.routed_issues.length > 0 && (
+                                                <div className="mt-3 rounded-xl p-4 border border-slate-200 bg-slate-50 shadow-sm text-slate-900">
+                                                    {message.routed_issues.map((issue, idx) => (
+                                                        <div key={idx} className="flex items-start gap-2 mb-2 last:mb-0">
+                                                            <CheckCircle2 size={16} className="text-emerald-500 mt-0.5 shrink-0" />
+                                                            <div className="text-sm">
+                                                                <span className="font-semibold block text-slate-800">{issue.specialist_type} Evaluation</span>
+                                                                <span className="text-xs text-slate-500">{issue.symptom_cluster}</span>
                                                             </div>
                                                         </div>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-
-                        {/* Emergency Alert */}
-                        {isEmergency && phase !== "INPUT" && (
-                            <div className="border-l-4 border-red-500 bg-red-500/10 rounded-lg p-5">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <AlertTriangle size={18} className="text-red-500" />
-                                    <h4 className="text-sm font-semibold text-red-400 uppercase tracking-wider">
-                                        Immediate Clinical Attention Required
-                                    </h4>
-                                </div>
-                                <p className="text-sm text-red-200 mb-4 leading-relaxed">
-                                    {systemMessage || "Your symptoms indicate a condition requiring immediate clinical attention."}
-                                </p>
-                                <div className="p-4 bg-brand-input rounded-lg border border-white/10">
-                                    <p className="text-sm font-medium text-white mb-2">
-                                        Please proceed to the nearest emergency facility or call the clinic directly.
-                                    </p>
-                                    <p className="text-xs text-brand-text-muted">
-                                        Online booking is not available for emergency cases.
-                                    </p>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* ── SECTION 3: Clinical Details (Dynamic) ────── */}
-                        <AnimatePresence>
-                            {phase === "CLARIFY" && clarificationIssues && (
-                                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15 }}>
-                                    <ClarificationPanel
-                                        issues={clarificationIssues}
-                                        loading={loading}
-                                        onComplete={(data) => handleClarificationSubmit(data)}
-                                    />
-                                </motion.div>
-                            )}
-
-                            {/* Legacy Fallback for unstructured clarification */}
-                            {phase === "CLARIFY" && !clarificationIssues && (
-                                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15 }}>
-                                    <Section title="Complete Required Clinical Details">
-                                        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                                            <p style={{ color: "var(--text-secondary)", fontSize: "0.8125rem", margin: 0, lineHeight: 1.6, paddingBottom: "10px", borderBottom: "1px solid var(--border-primary)" }}>
-                                                Please provide more details about your concern.
-                                            </p>
-                                            <div className="relative">
-                                                <textarea
-                                                    value={symptomText}
-                                                    onChange={(e) => setSymptomText(e.target.value)}
-                                                    className="w-full bg-brand-input border border-[var(--border-primary)] rounded-lg p-4 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all resize-none h-32"
-                                                    placeholder="Describe here..."
-                                                    disabled={loading}
-                                                    style={{ width: "100%", minHeight: "100px" }}
-                                                />
-                                                <button
-                                                    onClick={handleAnalyze}
-                                                    disabled={loading || !symptomText.trim()}
-                                                    className="absolute bottom-4 right-4 p-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                                    style={{ marginTop: "10px" }}
-                                                >
-                                                    Submit
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </Section>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-
-                        {/* SECTION 4: Risk Assessment Grid */}
-                        <AnimatePresence>
-                            {orchestration && (phase === "RESULTS" || phase === "SLOTS" || phase === "CONFIRM") && (
-                                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15, delay: 0.05 }}>
-                                    <div className="card">
-                                        <div className="card-header">
-                                            <h3 className="card-title">Clinical Risk Assessment</h3>
-                                            <p className="card-subtitle">Automated triage evaluation</p>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                                            <div className="p-4 bg-brand-input rounded-lg border border-white/5">
-                                                <h6 className="text-xs font-semibold text-brand-text-muted uppercase tracking-wider mb-2">
-                                                    Urgency Level
-                                                </h6>
-                                                <div className="text-sm font-semibold" style={{ color: urgencyColor(orchestration.overall_urgency) }}>
-                                                    {urgencyLabel(orchestration.overall_urgency)}
-                                                </div>
-                                            </div>
-
-                                            <div className="p-4 bg-brand-input rounded-lg border border-white/5">
-                                                <h6 className="text-xs font-semibold text-brand-text-muted uppercase tracking-wider mb-2">
-                                                    Emergency Status
-                                                </h6>
-                                                <div className="text-sm font-semibold" style={{ color: isEmergency ? "var(--clinical-urgent)" : "var(--clinical-safe)" }}>
-                                                    {isEmergency ? "Detected" : "Not Detected"}
-                                                </div>
-                                            </div>
-
-                                            <div className="p-4 bg-brand-input rounded-lg border border-white/5">
-                                                <h6 className="text-xs font-semibold text-brand-text-muted uppercase tracking-wider mb-2">
-                                                    Airway Risk
-                                                </h6>
-                                                <div className="text-sm font-semibold" style={{ color: breathingDifficulty ? "var(--clinical-urgent)" : "var(--clinical-safe)" }}>
-                                                    {breathingDifficulty ? "Reported" : "Not Reported"}
-                                                </div>
-                                            </div>
-
-                                            <div className="p-4 bg-brand-input rounded-lg border border-white/5">
-                                                <h6 className="text-xs font-semibold text-brand-text-muted uppercase tracking-wider mb-2">
-                                                    Clinical Status
-                                                </h6>
-                                                <div className="text-sm font-semibold text-white">
-                                                    {triageStatus}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {bookingBlocked && (
-                                            <div className="border-l-4 border-amber-500 bg-amber-500/10 rounded-lg p-4 mb-3">
-                                                <p className="text-sm font-medium text-amber-200">
-                                                    {isEmergency
-                                                        ? "Online booking is disabled for emergency cases. Please contact the clinic directly."
-                                                        : "Clinical review required before booking. Additional information may be needed."
-                                                    }
-                                                </p>
-                                            </div>
-                                        )}
-
-                                        <p className="text-xs text-brand-text-disabled leading-relaxed">
-                                            Clinical review required — all assessments are subject to provider verification
-                                        </p>
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-
-                        {/* SECTION 5: Specialist Routing Recommendation */}
-                        <AnimatePresence>
-                            {orchestration && orchestration.routed_issues.length > 0 && (phase === "RESULTS" || phase === "SLOTS" || phase === "CONFIRM") && (
-                                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15, delay: 0.1 }}>
-                                    <div className="card">
-                                        <div className="card-header">
-                                            <h3 className="card-title">Specialist Evaluation Recommendation</h3>
-                                            <p className="card-subtitle">Constraint-based clinical routing</p>
-                                        </div>
-
-                                        {/* Liability Disclaimer */}
-                                        <div className="p-3 mb-4 bg-cyan-500/10 border border-cyan-500/20 rounded-lg">
-                                            <p className="text-xs text-cyan-200 leading-relaxed">
-                                                <strong>Routing Recommendation:</strong> Based on reported symptoms and structured intake responses.
-                                                Final clinical decisions are made by the treating provider.
-                                            </p>
-                                        </div>
-
-                                        <div className="flex flex-col gap-3">
-                                            {orchestration.routed_issues.map((issue, i) => (
-                                                <div key={i} className="p-4 bg-brand-input rounded-lg border border-white/5 hover:border-white/10 transition-colors">
-                                                    <div className="flex justify-between items-start mb-3">
-                                                        <div className="flex-1">
-                                                            <h4 className="text-sm font-semibold text-white mb-1">
-                                                                {issue.procedure_name || `${issue.specialist_type} Evaluation`}
-                                                            </h4>
-                                                            <p className="text-xs text-brand-text-muted">
-                                                                {issue.specialist_type} • {issue.appointment_type || "Consultation"} • {issue.duration_minutes || 30} min
-                                                            </p>
-                                                        </div>
-                                                        <ChevronRight size={16} className="text-brand-text-disabled" />
+                                                    ))}
+                                                    <div className="mt-3 pt-3 border-t border-slate-200 flex gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleViewSlots(message.routed_issues)}
+                                                            className="flex-1 py-2 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary-dark shadow-sm shadow-primary/10 transition-colors"
+                                                        >
+                                                            View Slots
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="flex-1 py-2 bg-white border border-slate-200 shadow-sm text-slate-700 text-xs font-semibold rounded-lg hover:bg-slate-50 transition-colors"
+                                                        >
+                                                            Coordinator
+                                                        </button>
                                                     </div>
-
-                                                    {/* Resource Requirements */}
-                                                    {(issue.room_capability || issue.requires_sedation || issue.requires_anesthetist) && (
-                                                        <div className="flex flex-wrap gap-2 mb-2">
-                                                            {issue.room_capability && Object.entries(issue.room_capability)
-                                                                .filter(([, v]) => v === true)
-                                                                .map(([k]) => (
-                                                                    <span key={k} className="text-xs px-2 py-1 bg-brand-elevated rounded border border-white/10 text-brand-text-secondary">
-                                                                        {k.charAt(0).toUpperCase() + k.slice(1)}
-                                                                    </span>
-                                                                ))}
-                                                            {issue.requires_sedation && (
-                                                                <span className="text-xs px-2 py-1 bg-brand-elevated rounded border border-white/10 text-brand-text-secondary">
-                                                                    Sedation Capability
-                                                                </span>
-                                                            )}
-                                                            {issue.requires_anesthetist && (
-                                                                <span className="text-xs px-2 py-1 bg-brand-elevated rounded border border-white/10 text-brand-text-secondary">
-                                                                    Anesthetist Available
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    )}
-
-                                                    {/* Fallback Tier Notice */}
-                                                    {issue.fallback_tier > 1 && issue.fallback_note && (
-                                                        <p className="text-xs text-cyan-400 italic mt-2">
-                                                            {issue.fallback_note}
-                                                        </p>
-                                                    )}
                                                 </div>
-                                            ))}
+                                            )}
 
-                                            {orchestration.combined_visit_possible && (
-                                                <div className="p-3 bg-cyan-500/10 border border-cyan-500/20 rounded-lg">
-                                                    <p className="text-xs text-cyan-200">
-                                                        Combined visit possible — appointments may be scheduled together to minimize visits
-                                                    </p>
+                                            {message.isEmergency && (
+                                                <div className="mt-3 flex flex-col gap-2">
+                                                    <a href="tel:911" className="flex items-center justify-center gap-2 py-2 bg-red-600/10 text-red-700 border border-red-200 rounded-lg font-bold text-sm hover:bg-red-600/20 shadow-sm">
+                                                        <Phone size={16} /> Call Emergency Services
+                                                    </a>
+                                                    <a href="#" className="flex items-center justify-center gap-2 py-2 bg-white text-slate-800 border border-slate-200 rounded-lg font-semibold text-sm hover:bg-slate-50 shadow-sm">
+                                                        <MapPin size={16} /> Find Urgent Care
+                                                    </a>
                                                 </div>
                                             )}
                                         </div>
                                     </div>
+
+                                    {message.role === "user" && (
+                                        <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white shrink-0 shadow-sm border border-slate-200 text-xs font-bold">
+                                            {(user?.patient_name || user?.clinic_name || "Pt").substring(0, 2).toUpperCase()}
+                                        </div>
+                                    )}
                                 </motion.div>
-                            )}
-                        </AnimatePresence>
+                            );
+                        })}
 
-                        {/* SECTION 6: Available Appointment Slots */}
-                        <AnimatePresence>
-                            {(phase === "SLOTS" || phase === "CONFIRM") && slots.length > 0 && (
-                                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15, delay: 0.15 }}>
-                                    <div className="card">
-                                        <div className="card-header">
-                                            <h3 className="card-title">Available Appointments ({slots.length})</h3>
-                                            <p className="card-subtitle">Select your preferred time slot</p>
-                                        </div>
-
-                                        <div className="flex flex-col gap-2">
-                                            {slots.slice(0, 8).map((slot, i) => (
-                                                <button
-                                                    key={i}
-                                                    onClick={() => { setSelectedSlot(slot); setPhase("CONFIRM"); }}
-                                                    className={`grid grid-cols-[100px_80px_1fr_auto] gap-4 items-center p-4 w-full text-left rounded-lg border transition-all ${selectedSlot === slot
-                                                        ? "bg-cyan-500/10 border-cyan-500"
-                                                        : "bg-brand-input border-white/5 hover:border-white/20"
-                                                        }`}
-                                                >
-                                                    <span className="text-sm font-medium text-white">{slot.date}</span>
-                                                    <span className="text-sm font-semibold text-cyan-400">{slot.time}</span>
-                                                    <div className="min-w-0">
-                                                        <p className="text-sm text-brand-text-secondary truncate">
-                                                            {slot.doctor_name}
-                                                        </p>
-                                                        <p className="text-xs text-brand-text-muted truncate">
-                                                            {slot.clinic_name}
-                                                        </p>
-                                                    </div>
-                                                    <span className="text-xs text-brand-text-muted whitespace-nowrap">
-                                                        {slot.duration_minutes} min
-                                                    </span>
-                                                </button>
-                                            ))}
-                                        </div>
+                        {!hasActiveStructuredClarification && suggestedQuestions.length > 0 && (
+                            <div className="flex gap-4 items-end group">
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shrink-0 shadow-sm">
+                                    <Bot size={16} />
+                                </div>
+                                <div className="flex flex-col gap-1 max-w-[80%]">
+                                    <span className="text-xs font-medium text-text-secondary ml-1">Suggested Options</span>
+                                    <div className="flex flex-wrap gap-2 mt-1">
+                                        {suggestedQuestions.map((question, index) => (
+                                            <button
+                                                key={`${question}-${index}`}
+                                                type="button"
+                                                onClick={() => handleSuggestionClick(question)}
+                                                className="text-xs bg-white border border-slate-200 hover:border-primary hover:text-primary text-text-secondary px-3 py-1.5 rounded-full transition-colors font-medium shadow-sm"
+                                            >
+                                                {question}
+                                            </button>
+                                        ))}
                                     </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
+                                </div>
+                            </div>
+                        )}
 
-                        {/* SECTION 7: Appointment Confirmation */}
-                        <AnimatePresence>
-                            {phase === "CONFIRM" && selectedSlot && (
-                                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15 }}>
-                                    <div className="card">
-                                        <div className="card-header">
-                                            <h3 className="card-title">Confirm Appointment</h3>
-                                            <p className="card-subtitle">Review and finalize booking</p>
-                                        </div>
+                        {isTyping && (
+                            <div className="flex gap-4 items-end group">
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shrink-0 shadow-sm opacity-50">
+                                    <Bot size={16} />
+                                </div>
+                                <div className="bg-white px-4 py-3 rounded-2xl rounded-bl-sm shadow-soft border border-slate-100 flex items-center gap-1.5 h-[48px]">
+                                    <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                                    <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                                    <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                                </div>
+                            </div>
+                        )}
 
-                                        {/* Appointment Details Grid */}
-                                        <div className="grid grid-cols-2 gap-4 p-4 bg-brand-input rounded-lg mb-4">
-                                            <div className="flex items-start gap-3">
-                                                <Calendar size={16} className="text-brand-text-muted mt-0.5" />
-                                                <div>
-                                                    <p className="text-xs text-brand-text-muted uppercase tracking-wider mb-1">Date</p>
-                                                    <p className="text-sm font-medium text-white">{selectedSlot.date}</p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-start gap-3">
-                                                <Clock size={16} className="text-brand-text-muted mt-0.5" />
-                                                <div>
-                                                    <p className="text-xs text-brand-text-muted uppercase tracking-wider mb-1">Time</p>
-                                                    <p className="text-sm font-medium text-white">{selectedSlot.time} – {selectedSlot.end_time}</p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-start gap-3">
-                                                <User size={16} className="text-brand-text-muted mt-0.5" />
-                                                <div>
-                                                    <p className="text-xs text-brand-text-muted uppercase tracking-wider mb-1">Provider</p>
-                                                    <p className="text-sm font-medium text-white">{selectedSlot.doctor_name}</p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-start gap-3">
-                                                <Activity size={16} className="text-brand-text-muted mt-0.5" />
-                                                <div>
-                                                    <p className="text-xs text-brand-text-muted uppercase tracking-wider mb-1">Duration</p>
-                                                    <p className="text-sm font-medium text-white">{selectedSlot.duration_minutes} min</p>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Optional Notes */}
-                                        <div className="mb-4">
-                                            <label className="block text-sm font-medium text-brand-text-secondary mb-2">
-                                                Notes for Provider (optional)
-                                            </label>
-                                            <textarea
-                                                value={bookingNotes}
-                                                onChange={(e) => setBookingNotes(e.target.value)}
-                                                placeholder="Any additional information..."
-                                                className="w-full min-h-[80px] resize-vertical p-3 text-sm leading-relaxed bg-brand-input border border-white/10 rounded-lg text-white placeholder-brand-text-muted focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all"
-                                            />
-                                        </div>
-
-                                        {/* Action Buttons */}
-                                        <div className="flex gap-3">
-                                            {bookingBlocked ? (
-                                                <div className="flex-1 border-l-4 border-amber-500 bg-amber-500/10 rounded-lg p-4">
-                                                    <p className="text-sm font-medium text-amber-200 mb-2">
-                                                        {isEmergency
-                                                            ? "Online booking is not available for emergency cases."
-                                                            : "Additional clinical review is required before booking."
-                                                        }
-                                                    </p>
-                                                    <p className="text-xs text-amber-300/70">
-                                                        Please contact the clinic directly to schedule your appointment.
-                                                    </p>
-                                                </div>
-                                            ) : (
-                                                <>
-                                                    <button
-                                                        onClick={handleConfirmBooking}
-                                                        disabled={loading}
-                                                        className="btn-primary flex-1"
-                                                    >
-                                                        {loading ? "Booking..." : "Confirm Appointment"}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => { setSelectedSlot(null); setPhase("SLOTS"); }}
-                                                        className="btn-secondary"
-                                                    >
-                                                        Back
-                                                    </button>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-
-                        {/* Booking Confirmation Success */}
-                        <AnimatePresence>
-                            {phase === "BOOKED" && (
-                                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15 }}>
-                                    <div className="border-l-4 border-emerald-500 bg-emerald-500/10 rounded-lg p-5">
-                                        <div className="flex items-center gap-2 mb-3">
-                                            <CheckCircle2 size={18} className="text-emerald-500" />
-                                            <h4 className="text-sm font-semibold text-emerald-400 uppercase tracking-wider">
-                                                Appointment Confirmed
-                                            </h4>
-                                        </div>
-                                        {selectedSlot && (
-                                            <p className="text-sm text-emerald-200 mb-4">
-                                                {selectedSlot.date} at {selectedSlot.time} with {selectedSlot.doctor_name}
-                                            </p>
-                                        )}
-                                        <button
-                                            onClick={handleNewIntake}
-                                            className="btn-secondary text-sm"
-                                        >
-                                            New Intake
-                                        </button>
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
+                        <div ref={messagesEndRef} />
                     </div>
+                </div>
 
-                    {/* RIGHT PANEL - Case Summary */}
-                    <div className="flex flex-col gap-4 lg:sticky lg:top-6">
-                        {/* Case Summary Card */}
-                        <div className="card">
-                            <h6 className="text-xs font-semibold text-brand-text-muted uppercase tracking-wider mb-4">
-                                Case Summary
-                            </h6>
-                            <div className="flex flex-col gap-3">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-xs text-brand-text-muted">Status</span>
-                                    <span className="text-xs font-medium text-white">
-                                        {phase === "INPUT" ? "Awaiting Information" :
-                                            phase === "CLARIFY" ? "Pending Clarification" :
-                                                phase === "RESULTS" ? "Under Review" :
-                                                    phase === "SLOTS" ? "Slot Selection" :
-                                                        phase === "CONFIRM" ? "Pending Confirmation" :
-                                                            "Complete"}
-                                    </span>
-                                </div>
-
-                                <div className="flex justify-between items-center">
-                                    <span className="text-xs text-brand-text-muted">Urgency</span>
-                                    <span className="text-xs font-medium" style={{
-                                        color: orchestration ? urgencyColor(orchestration.overall_urgency) : "var(--text-white)"
-                                    }}>
-                                        {orchestration ? urgencyLabel(orchestration.overall_urgency) : "—"}
-                                    </span>
-                                </div>
-
-                                <div className="flex justify-between items-center">
-                                    <span className="text-xs text-brand-text-muted">Issues Identified</span>
-                                    <span className="text-xs font-medium text-white">
-                                        {orchestration ? `${Math.max(orchestration.routed_issues.length, isEmergency ? 1 : 0)}` : "—"}
-                                    </span>
-                                </div>
-
-                                <div className="flex justify-between items-center">
-                                    <span className="text-xs text-brand-text-muted">Risk Flags</span>
-                                    <span className="text-xs font-medium" style={{
-                                        color: isEmergency ? "var(--clinical-urgent)" : "var(--text-white)"
-                                    }}>
-                                        {isEmergency ? (breathingDifficulty ? "Emergency • Airway" : "Emergency") : "None"}
-                                    </span>
-                                </div>
-
-                                <div className="flex justify-between items-center">
-                                    <span className="text-xs text-brand-text-muted">Last Updated</span>
-                                    <span className="text-xs font-medium text-white">{lastUpdated || "—"}</span>
-                                </div>
+                <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-background-light via-background-light to-transparent pointer-events-none">
+                    <div className="max-w-3xl mx-auto pointer-events-auto">
+                        {activeAction === "ESCALATE" && (
+                            <div className="mb-3 rounded-xl border border-red-200 bg-red-50/90 px-4 py-3 text-sm font-semibold text-red-700 shadow-sm text-center backdrop-blur-md">
+                                Emergency escalation is active. Text input is disabled while urgent instructions are shown.
                             </div>
+                        )}
 
-                            {/* Selected Slot Preview */}
-                            {selectedSlot && (
-                                <div className="pt-4 mt-4 border-t border-white/5">
-                                    <h6 className="text-xs font-semibold text-brand-text-muted uppercase tracking-wider mb-2">
-                                        Selected Appointment
-                                    </h6>
-                                    <p className="text-sm font-medium text-white mb-1">
-                                        {selectedSlot.date} at {selectedSlot.time}
-                                    </p>
-                                    <p className="text-xs text-brand-text-secondary">
-                                        {selectedSlot.doctor_name}
-                                    </p>
-                                </div>
-                            )}
-                        </div>
+                        <form onSubmit={handleInputSubmit} className="bg-white rounded-full shadow-floating border border-slate-200 p-2 pl-6 flex items-center gap-3 transition-shadow focus-within:shadow-xl focus-within:border-primary/30">
+                            <button type="button" className="text-text-secondary hover:text-primary transition-colors p-1" title="Attach File">
+                                <Paperclip size={20} />
+                            </button>
+                            <button type="button" className="text-text-secondary hover:text-primary transition-colors p-1" title="Voice Input">
+                                <Mic size={20} />
+                            </button>
+                            <input
+                                ref={inputRef}
+                                type="text"
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                placeholder={
+                                    textInputDisabled && hasActiveStructuredClarification
+                                        ? "Please submit the clarification form above..."
+                                        : isLoading
+                                            ? "Analyzing..."
+                                            : "Type patient response or symptoms..."
+                                }
+                                disabled={textInputDisabled}
+                                className="flex-1 bg-transparent border-none outline-none text-text-main placeholder-slate-400 text-sm focus:ring-0 h-10 shadow-none ring-0 w-full"
+                            />
+                            <button
+                                type="submit"
+                                disabled={!input.trim() || textInputDisabled}
+                                className="bg-primary hover:bg-primary-dark text-white rounded-full w-10 h-10 flex items-center justify-center shadow-lg shadow-primary/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                                title="Send Message"
+                            >
+                                {isLoading ? <Loader2 size={18} className="animate-spin" /> : <ArrowUp size={18} />}
+                            </button>
+                        </form>
 
-                        {/* Clinical Safety Notice */}
-                        <div className="card">
-                            <div className="flex items-center gap-2 mb-3">
-                                <Shield size={14} className="text-brand-text-muted" />
-                                <h6 className="text-xs font-semibold text-brand-text-muted uppercase tracking-wider">
-                                    Clinical Safety Notice
-                                </h6>
-                            </div>
-                            <p className="text-xs text-brand-text-disabled leading-relaxed">
-                                This system assists with appointment routing only. It does not provide diagnosis or treatment.
-                                All cases are reviewed by licensed dental professionals.
-                            </p>
+                        <div className="text-center mt-3">
+                            <p className="text-[10px] text-text-secondary">AI can make mistakes. Please review generated notes.</p>
                         </div>
                     </div>
                 </div>
             </div>
-        </DashboardLayout >
-    );
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// HELPER COMPONENTS
-// ══════════════════════════════════════════════════════════════════════════════
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-    return (
-        <div className="card">
-            <h6 className="text-xs font-semibold text-brand-text-muted uppercase tracking-wider mb-4">
-                {title}
-            </h6>
-            {children}
-        </div>
-    );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-    return (
-        <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-brand-text-secondary">{label}</label>
-            {children}
-        </div>
-    );
-}
-
-function Metric({ label, value, color }: { label: string; value: string; color: string }) {
-    return (
-        <div className="p-3 bg-brand-input rounded-lg">
-            <h6 className="text-xs font-medium text-brand-text-muted uppercase tracking-wider mb-1">
-                {label}
-            </h6>
-            <div className="text-sm font-semibold" style={{ color }}>
-                {value}
-            </div>
-        </div>
-    );
-}
-
-function SummaryRow({ label, value, color }: { label: string; value: string; color?: string }) {
-    return (
-        <div className="flex justify-between items-center">
-            <span className="text-xs text-brand-text-muted">{label}</span>
-            <span className="text-xs font-medium" style={{ color: color || "var(--text-primary)" }}>
-                {value}
-            </span>
-        </div>
-    );
-}
-
-function DetailField({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-    return (
-        <div className="flex items-start gap-3">
-            <span className="text-brand-text-muted mt-0.5">{icon}</span>
-            <div>
-                <p className="text-xs text-brand-text-muted uppercase tracking-wider mb-1">{label}</p>
-                <p className="text-sm font-medium text-white">{value}</p>
-            </div>
-        </div>
+        </DashboardLayout>
     );
 }

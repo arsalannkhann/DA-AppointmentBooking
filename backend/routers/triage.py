@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from schemas.triage import TriageRequest
 from core.dependencies import get_current_user, get_db_session, UserContext
-from core.intent_analyzer import analyze_intent, CONFIDENCE_THRESHOLD
+from core.intent_analyzer import analyze_intent
 from core.emergency_handler import handle_emergency
 from core.rate_limit import AuthenticatedRateLimit
 from config import RATE_LIMIT_CHATBOT, RATE_LIMIT_TENANT_CHATBOT
@@ -43,7 +43,7 @@ def analyze_symptoms(
         history_dicts = [{"role": m.role, "content": m.content} for m in data.history]
 
     # 1. Intent Analysis (with chat history)
-    intent = analyze_intent(data.symptoms, history_dicts)
+    intent = analyze_intent(data.symptoms, history_dicts, data.structured_data)
 
     # 2. Orchestration
     plan = orchestrate(db, intent, tenant_id=user.tenant_id)

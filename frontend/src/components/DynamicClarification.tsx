@@ -5,7 +5,7 @@ import { CheckCircle2, AlertTriangle, HelpCircle } from "lucide-react";
 interface MissingField {
     field_key: string;
     label: string;
-    type: "text" | "select" | "slider" | "boolean";
+    type: "text" | "select" | "slider" | "boolean" | "multiselect" | "checkbox_group";
     required: boolean;
     options?: string[];
     min?: number;
@@ -37,8 +37,8 @@ const FieldRenderer = ({
         case "text":
             return (
                 <div className="space-y-2">
-                    <label className="text-sm font-medium text-brand-text-secondary">
-                        {field.label} {field.required && <span className="text-red-400">*</span>}
+                    <label className="text-sm font-medium text-slate-700">
+                        {field.label} {field.required && <span className="text-red-500">*</span>}
                     </label>
                     <input
                         className="w-full bg-brand-input border border-[var(--border-primary)] rounded-lg px-4 py-3 text-white placeholder-brand-text-muted focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 transition-all"
@@ -52,8 +52,8 @@ const FieldRenderer = ({
         case "select":
             return (
                 <div className="space-y-2">
-                    <label className="text-sm font-medium text-brand-text-secondary">
-                        {field.label} {field.required && <span className="text-red-400">*</span>}
+                    <label className="text-sm font-medium text-slate-700">
+                        {field.label} {field.required && <span className="text-red-500">*</span>}
                     </label>
                     <div className="relative">
                         <select
@@ -66,7 +66,7 @@ const FieldRenderer = ({
                                 <option key={opt} value={opt}>{opt}</option>
                             ))}
                         </select>
-                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-brand-text-muted">
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
                             ▼
                         </div>
                     </div>
@@ -77,8 +77,8 @@ const FieldRenderer = ({
             return (
                 <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                        <label className="text-sm font-medium text-brand-text-secondary">
-                            {field.label} {field.required && <span className="text-red-400">*</span>}
+                        <label className="text-sm font-medium text-slate-700">
+                            {field.label} {field.required && <span className="text-red-500">*</span>}
                         </label>
                         <span className="text-sm font-bold text-cyan-400 bg-cyan-500/10 px-2 py-1 rounded">
                             {value || field.min || 1}/10
@@ -93,7 +93,7 @@ const FieldRenderer = ({
                         onChange={(e) => onChange(parseInt(e.target.value))}
                         className="w-full h-2 bg-brand-elevated rounded-lg appearance-none cursor-pointer accent-cyan-500"
                     />
-                    <div className="flex justify-between text-xs text-brand-text-muted px-1">
+                    <div className="flex justify-between text-xs text-slate-500 px-1">
                         <span>Mild</span>
                         <span>Moderate</span>
                         <span>Severe</span>
@@ -104,15 +104,15 @@ const FieldRenderer = ({
         case "boolean":
             return (
                 <div className="space-y-2">
-                    <label className="text-sm font-medium text-brand-text-secondary">
-                        {field.label} {field.required && <span className="text-red-400">*</span>}
+                    <label className="text-sm font-medium text-slate-700">
+                        {field.label} {field.required && <span className="text-red-500">*</span>}
                     </label>
                     <div className="flex gap-3">
                         <button
                             onClick={() => onChange(true)}
                             className={`flex-1 py-3 px-4 rounded-lg border transition-all ${value === true
                                 ? "bg-rose-500/20 border-rose-500/50 text-rose-200"
-                                : "bg-brand-input border-[var(--border-primary)] text-brand-text-muted hover:bg-brand-elevated"
+                                : "bg-brand-input border-[var(--border-primary)] text-slate-500 hover:bg-brand-elevated"
                                 }`}
                         >
                             Yes
@@ -121,7 +121,7 @@ const FieldRenderer = ({
                             onClick={() => onChange(false)}
                             className={`flex-1 py-3 px-4 rounded-lg border transition-all ${value === false
                                 ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-200"
-                                : "bg-brand-input border-[var(--border-primary)] text-brand-text-muted hover:bg-brand-elevated"
+                                : "bg-brand-input border-[var(--border-primary)] text-slate-500 hover:bg-brand-elevated"
                                 }`}
                         >
                             No
@@ -130,8 +130,54 @@ const FieldRenderer = ({
                 </div>
             );
 
+        case "multiselect":
+        case "checkbox_group":
+            // Treat both as checkbox groups for simplicity
+            const currentValues: string[] = Array.isArray(value) ? value : [];
+
+            const toggleOption = (opt: string) => {
+                if (currentValues.includes(opt)) {
+                    onChange(currentValues.filter(v => v !== opt));
+                } else {
+                    onChange([...currentValues, opt]);
+                }
+            };
+
+            return (
+                <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-700">
+                        {field.label} {field.required && <span className="text-red-500">*</span>}
+                    </label>
+                    <div className="grid gap-2">
+                        {field.options?.map(opt => {
+                            const isSelected = currentValues.includes(opt);
+                            return (
+                                <button
+                                    key={opt}
+                                    onClick={() => toggleOption(opt)}
+                                    className={`flex items-center gap-3 w-full p-3 rounded-lg border text-left transition-all ${isSelected
+                                        ? "bg-cyan-500/20 border-cyan-500/50 text-cyan-100"
+                                        : "bg-brand-input border-[var(--border-primary)] text-slate-500 hover:bg-brand-elevated"
+                                        }`}
+                                >
+                                    <div className={`w-5 h-5 rounded border flex items-center justify-center ${isSelected ? "bg-cyan-500 border-cyan-500" : "border-[var(--border-secondary)]"
+                                        }`}>
+                                        {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
+                                    </div>
+                                    <span className="text-sm">{opt}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+
         default:
-            return null;
+            return (
+                <div className="p-4 bg-red-500/10 border border-red-500/20 rounded text-red-500 text-sm">
+                    Unsupported field type: {field.type}
+                </div>
+            );
     }
 };
 
@@ -145,7 +191,13 @@ export const ClarificationPanel = ({ issues, onComplete, loading }: Clarificatio
         const isValid = issues.every(issue =>
             issue.missing_fields.every(field => {
                 const val = formData[`${issue.issue_id}_${field.field_key}`];
-                if (field.required) return val !== undefined && val !== "" && val !== null;
+
+                if (field.required) {
+                    // Start strict validation
+                    if (val === undefined || val === null || val === "") return false;
+                    if (Array.isArray(val) && val.length === 0) return false;
+                    return true;
+                }
                 return true;
             })
         );
@@ -173,7 +225,7 @@ export const ClarificationPanel = ({ issues, onComplete, loading }: Clarificatio
                     </div>
                     <div>
                         <h3 className="text-lg font-semibold text-white">Clinical Clarification Required</h3>
-                        <p className="text-sm text-brand-text-muted">Please provide the following details to proceed with routing.</p>
+                        <p className="text-sm text-slate-500">Please provide the following details to proceed with routing.</p>
                     </div>
                 </div>
 
@@ -185,7 +237,7 @@ export const ClarificationPanel = ({ issues, onComplete, loading }: Clarificatio
                                 <span className="badge badge-neutral text-xs">
                                     Issue {idx + 1}
                                 </span>
-                                <h4 className="text-brand-text-secondary font-medium capitalize">
+                                <h4 className="text-slate-700 font-medium capitalize">
                                     {issue.summary}
                                 </h4>
                             </div>
@@ -214,7 +266,7 @@ export const ClarificationPanel = ({ issues, onComplete, loading }: Clarificatio
                             flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all
                             ${canSubmit && !loading
                                 ? "btn-primary"
-                                : "bg-brand-elevated text-brand-text-muted cursor-not-allowed border border-[var(--border-primary)]"}
+                                : "bg-brand-elevated text-slate-500 cursor-not-allowed border border-[var(--border-primary)]"}
                         `}
                     >
                         {loading ? (

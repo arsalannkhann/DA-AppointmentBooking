@@ -156,17 +156,17 @@ export default function Sidebar({
                 transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
                 onMouseEnter={() => setIsHovering(true)}
                 onMouseLeave={() => setIsHovering(false)}
-                className={`fixed left-0 top-0 z-50 h-screen border-r border-white/5 bg-brand-primary flex flex-col ${isOpen ? "shadow-2xl shadow-black/40" : ""
+                className={`fixed left-0 top-0 z-50 h-screen border-r border-[#e2e8f0] bg-white flex flex-col ${isOpen ? "shadow-[20px_0_40px_-15px_rgba(0,0,0,0.05)]" : ""
                     }`}
             >
                 {/* Logo Area */}
-                <div className="flex h-16 items-center border-b border-white/5 px-4 bg-brand-primary">
+                <div className="flex h-16 items-center border-b border-[#e2e8f0] px-4 bg-white">
                     <Link
                         href="/"
                         className={`flex items-center gap-3 ${!isOpen && "justify-center"}`}
                     >
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-cyan-600">
-                            <Activity size={20} className="text-white" />
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary/10 text-primary">
+                            <Activity size={24} />
                         </div>
                         <AnimatePresence>
                             {isOpen && (
@@ -174,7 +174,7 @@ export default function Sidebar({
                                     initial={{ opacity: 0, x: -10 }}
                                     animate={{ opacity: 1, x: 0 }}
                                     exit={{ opacity: 0, x: -10 }}
-                                    className="whitespace-nowrap text-base font-semibold tracking-tight text-white"
+                                    className="whitespace-nowrap text-base font-[700] tracking-tight text-slate-900"
                                 >
                                     Clinical Platform
                                 </motion.span>
@@ -185,7 +185,7 @@ export default function Sidebar({
                     {/* Collapse Toggle (Desktop) */}
                     <button
                         onClick={handleToggle}
-                        className={`ml-auto hidden rounded-lg p-1.5 text-brand-text-muted transition-colors hover:bg-brand-secondary hover:text-white lg:flex ${!isOpen && "absolute -right-3 top-5 h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-brand-secondary text-xs"
+                        className={`ml-auto hidden rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-800 lg:flex ${!isOpen && "absolute right-2 top-5 h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-xs shadow-sm"
                             }`}
                     >
                         {isOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
@@ -202,7 +202,7 @@ export default function Sidebar({
                                 exit={{ opacity: 0 }}
                                 className="mb-4 px-3"
                             >
-                                <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-brand-text-muted">
+                                <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">
                                     {role === "admin" ? "Operations" : "Patient Portal"}
                                 </span>
                             </motion.div>
@@ -219,25 +219,22 @@ export default function Sidebar({
                                 <Link
                                     key={link.href}
                                     href={link.href}
-                                    className={`group relative flex items-center gap-3 rounded-xl px-3 py-3.5 text-sm font-medium transition-all ${isActive
-                                        ? "bg-cyan-500/10 text-cyan-400"
-                                        : "text-brand-text-secondary hover:bg-brand-secondary hover:text-white"
+                                    className={`group relative flex items-center gap-3 rounded-xl px-3 py-3.5 text-sm font-medium transition-all duration-200 ${isActive
+                                        ? "bg-primary/10 text-primary font-semibold shadow-sm"
+                                        : "text-slate-500 hover:bg-slate-50 hover:text-primary"
                                         } ${!isOpen && "justify-center"}`}
                                     onClick={() => { if (isMobile && onToggle) onToggle(); }}
                                 >
-                                    {/* Active Indicator */}
+                                    {/* Active Pulse Indicator */}
                                     {isActive && isOpen && (
-                                        <motion.div
-                                            layoutId="activeNav"
-                                            className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full bg-cyan-500"
-                                        />
+                                        <span className="absolute right-4 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-primary animate-pulse" />
                                     )}
 
                                     <div
-                                        className={`flex h-5 w-5 items-center justify-center transition-colors ${isActive ? "text-cyan-400" : "text-brand-text-muted group-hover:text-white"
+                                        className={`flex h-[22px] w-[22px] items-center justify-center transition-colors ${isActive ? "text-primary" : "text-slate-400 group-hover:text-primary"
                                             }`}
                                     >
-                                        <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+                                        <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
                                     </div>
 
                                     <AnimatePresence>
@@ -248,8 +245,8 @@ export default function Sidebar({
                                                 exit={{ opacity: 0, x: -10 }}
                                                 className="flex flex-col"
                                             >
-                                                <span className="whitespace-nowrap font-semibold leading-none">{link.name}</span>
-                                                <span className="mt-1 text-[10px] font-medium text-brand-text-muted">
+                                                <span className="whitespace-nowrap leading-none">{link.name}</span>
+                                                <span className={`mt-1 text-[10px] ${isActive ? "text-primary/80 font-medium" : "text-slate-400 font-normal"}`}>
                                                     {link.description}
                                                 </span>
                                             </motion.div>
@@ -258,9 +255,9 @@ export default function Sidebar({
 
                                     {/* Tooltip for collapsed state */}
                                     {!isOpen && (
-                                        <div className="absolute left-full top-1/2 z-50 ml-4 -translate-y-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-brand-secondary px-3 py-2 text-xs font-bold text-white opacity-0 shadow-2xl transition-all group-hover:opacity-100 group-hover:translate-x-1">
+                                        <div className="absolute left-full top-1/2 z-50 ml-4 -translate-y-1/2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800 opacity-0 shadow-lg transition-all group-hover:opacity-100 group-hover:translate-x-1">
                                             {link.name}
-                                            <div className="absolute -left-1 top-1/2 h-2 w-2 -translate-y-1/2 rotate-45 border-b border-l border-white/10 bg-brand-secondary" />
+                                            <div className="absolute -left-1 top-1/2 h-2 w-2 -translate-y-1/2 rotate-45 border-b border-l border-slate-200 bg-white" />
                                         </div>
                                     )}
                                 </Link>
@@ -278,17 +275,17 @@ export default function Sidebar({
                             exit={{ opacity: 0, height: 0 }}
                             className="mx-3 mb-4 overflow-hidden"
                         >
-                            <div className="rounded-xl border border-white/5 bg-brand-secondary p-3">
+                            <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
                                 <div className="flex items-center gap-2 mb-2">
                                     <span className="relative flex h-2 w-2">
-                                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-                                        <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+                                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/80 opacity-75"></span>
+                                        <span className="relative inline-flex h-2 w-2 rounded-full bg-primary"></span>
                                     </span>
-                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-primary">
                                         System Operational
                                     </span>
                                 </div>
-                                <div className="flex items-center gap-1.5 text-[10px] text-brand-text-muted">
+                                <div className="flex items-center gap-1.5 text-[10px] text-primary/80">
                                     <Shield size={10} />
                                     <span className="font-medium">HIPAA Compliant</span>
                                 </div>
@@ -298,12 +295,12 @@ export default function Sidebar({
                 </AnimatePresence>
 
                 {/* Footer */}
-                <div className="border-t border-white/5 p-4 bg-brand-primary" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+                <div className="border-t border-[#e2e8f0] p-4 bg-white" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
                     {/* Settings & Logout */}
                     <div className="flex flex-col gap-1">
                         <Link
                             href="/settings"
-                            className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-brand-text-secondary transition-colors hover:bg-brand-secondary hover:text-white ${!isOpen && "justify-center"
+                            className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800 ${!isOpen && "justify-center"
                                 }`}
                         >
                             <Settings size={20} />
@@ -323,7 +320,7 @@ export default function Sidebar({
 
                         <button
                             onClick={handleLogout}
-                            className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-rose-400 transition-colors hover:bg-rose-500/10 hover:text-rose-300 ${!isOpen && "justify-center"
+                            className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-rose-500 transition-colors hover:bg-rose-50 hover:text-rose-600 ${!isOpen && "justify-center"
                                 }`}
                         >
                             <LogOut size={20} />
@@ -344,10 +341,10 @@ export default function Sidebar({
 
                     {/* User Profile */}
                     <div
-                        className={`mt-4 flex items-center gap-3 rounded-xl border border-white/10 bg-brand-secondary/30 p-3 transition-colors hover:bg-brand-secondary/50 ${!isOpen && "flex-col"
+                        className={`mt-4 flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/80 p-3 transition-colors hover:bg-slate-100 cursor-pointer ${!isOpen && "flex-col"
                             }`}
                     >
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-brand-accent to-brand-accent-secondary text-sm font-bold text-white">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-white shadow-sm border-2 border-white pointer-events-none">
                             {userName
                                 .split(" ")
                                 .map((n) => n[0])
@@ -363,10 +360,10 @@ export default function Sidebar({
                                     exit={{ opacity: 0 }}
                                     className="flex min-w-0 flex-col"
                                 >
-                                    <span className="truncate text-sm font-bold text-white">
+                                    <span className="truncate text-sm font-[650] text-slate-800">
                                         {userName}
                                     </span>
-                                    <span className="text-[10px] font-medium text-brand-text-muted">
+                                    <span className="text-[10px] font-medium text-slate-500">
                                         {role === "admin" ? "Administrator" : "Standard Plan"}
                                     </span>
                                 </motion.div>

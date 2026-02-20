@@ -18,6 +18,7 @@ class TriageRequest(BaseModel):
     """Incoming patient message with conversation context."""
     symptoms: str
     history: Optional[List[ChatMessage]] = None
+    structured_data: Optional[dict] = None
 
 
 # ── LLM Output Models (Internal) ────────────────────────────────────────────

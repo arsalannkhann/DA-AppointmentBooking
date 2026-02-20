@@ -52,7 +52,8 @@ def deploy_schema():
             conn.execute(text(f"DROP TABLE IF EXISTS {tbl} CASCADE"))
         conn.commit()
 
-    schema_path = os.path.join(os.path.dirname(__file__), "schema.sql")
+    base_dir = os.path.dirname(os.path.dirname(__file__))
+    schema_path = os.path.join(base_dir, "sql", "schema.sql")
     with open(schema_path) as f:
         ddl = f.read()
 
@@ -66,7 +67,7 @@ def deploy_schema():
     ]
     migrations_sql = ""
     for mf in migration_files:
-        mpath = os.path.join(os.path.dirname(__file__), mf)
+        mpath = os.path.join(base_dir, "sql", "migrations", mf)
         if os.path.exists(mpath):
             with open(mpath) as f:
                 migrations_sql += f.read() + "\n"

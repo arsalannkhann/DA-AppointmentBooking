@@ -56,6 +56,8 @@ class OrchestrationPlan:
     clarification_questions: List[str] = None
     emergency_slots: Optional[dict] = None  # Pre-resolved slots for emergency triage
     clarification: Optional[dict] = None  # Structured missing fields for UI
+    fhir_bundle: Optional[dict] = None # HL7 FHIR Payload
+    routing_explanation: Optional[str] = None # Liability-Safe Reasoning
 
     def to_dict(self):
         return {
@@ -90,6 +92,8 @@ class OrchestrationPlan:
             "clarification_questions": self.clarification_questions or [],
             "emergency_slots": self.emergency_slots,
             "clarification": self.clarification,
+            "fhir_bundle": self.fhir_bundle,
+            "routing_explanation": self.routing_explanation
         }
 
 
@@ -148,96 +152,36 @@ def _map_category_to_specialist(category: str, detail: str) -> str:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-#  Drilldown Validation (Programmatic Safety Net)
+#  Drilldown Validation (Clinical Gate Integration)
 # ═══════════════════════════════════════════════════════════════════════════
 
-# Duration detection — catches natural language ("3 days", "since Monday", "last night", "a week")
-_DURATION_REGEX = re.compile(
-    r"(\d+\s*(day|week|month|year|hour|hr|min|minute)s?)"
-    r"|(since\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday|yesterday|last\s*(week|month|night)))"
-    r"|(last\s*(night|week|month|few\s*days))"
-    r"|(for\s+a\s*(while|long\s*time|few\s*days))"
-    r"|(started\s+(yesterday|today|recently|suddenly))"
-    r"|(on\s*and\s*off)",
-    re.IGNORECASE
-)
-
-# Severity detection — catches "severe", "killing me", "9/10", "unbearable"
-_SEVERITY_REGEX = re.compile(
-    r"(severe|excruciating|unbearable|terrible|awful|horrible|intense|extreme)"
-    r"|(killing\s*me|can'?t\s*(sleep|eat|function|stand))"
-    r"|(\b[7-9]\b\s*(/|out\s*of)\s*10)"
-    r"|(10\s*(/|out\s*of)\s*10)"
-    r"|(very\s*(bad|painful|sore))"
-    r"|(worst\s*pain)",
-    re.IGNORECASE
-)
-
-# Location detection
-_LOCATION_REGEX = re.compile(
-    r"(upper|lower|front|back|left|right|top|bottom)"
-    r"|(molar|premolar|incisor|canine|wisdom)"
-    r"|(tooth|teeth)\s*#?\d+"
-    r"|([UL][LR]\s*Q?[1-4])"
-    r"|(quadrant\s*[1-4])",
-    re.IGNORECASE
-)
-
+from core import clinical_gate
 
 def _validate_clinical_completeness(intent: IntentResult) -> Optional[List[str]]:
     """
-    Programmatic drilldown validation. Checks that essential clinical info is present.
-    Returns a list of clarification questions if validation fails, otherwise None.
-
-    Decision Tree:
-    - All issues: must have suspected_category + symptom_cluster
-    - HIGH/EMERGENCY urgency: must have (duration OR severity)
-    - Pain keywords: must have location
-    - Swelling keywords: must check breathing/swallowing (safety)
+    Uses the Clinical Gate Layer to generate strict doctor-like questioning.
+    Returns a list of ONE or more questions if incomplete.
     """
-    missing_questions = []
-
+    questions = []
+    
+    # If the user explicitly asks for clarification or help, we might want to respect that
+    # But generally we want to drive the clinical interview.
+    
     for issue in intent.issues:
-        # Basic field check
-        if not issue.suspected_category or not issue.symptom_cluster:
-            missing_questions.append("Could you describe your symptoms in more detail?")
-            continue
-
-        detail = (issue.symptom_cluster + " " + " ".join(issue.reported_symptoms)).lower()
-        has_duration = bool(_DURATION_REGEX.search(detail))
-        has_severity = bool(_SEVERITY_REGEX.search(detail))
-        has_location = bool(_LOCATION_REGEX.search(detail)) or bool(issue.location)
-
-        # Pain-related: need location
-        pain_keywords = ["pain", "hurt", "ache", "throb", "sore", "sensitive"]
-        is_pain = any(kw in detail for kw in pain_keywords)
-
-        if is_pain and not has_location:
-            missing_questions.append("Where exactly is the pain located? (e.g., upper right, lower left)")
-
-        # High urgency: need at least duration OR severity
-        if issue.urgency in ("HIGH", "EMERGENCY"):
-            if not has_duration and not has_severity:
-                missing_questions.append("How long have you been experiencing these symptoms?")
-
-        # Swelling: safety check for airway
-        swelling_keywords = ["swelling", "swollen", "swells", "puffed", "inflamed"]
-        is_swelling = any(kw in detail for kw in swelling_keywords)
-
-        if is_swelling:
-            # Check if breathing/swallowing is mentioned
-            airway_keywords = ["breath", "swallow", "airway", "throat"]
-            has_airway_check = any(kw in detail for kw in airway_keywords)
-            if not has_airway_check:
-                missing_questions.append(
-                    "Do you have any difficulty swallowing or breathing due to the swelling? "
-                    "(This is an important safety check)"
-                )
-
+        # 1. Run Assessment
+        clinical_gate.assess_issue_completeness(issue)
+        clinical_gate.prune_answered_elements(issue)
+        
+        # 2. Get Next Question (Sequential)
+        if issue.missing_clinical_elements:
+            q = clinical_gate.get_next_clinical_question(issue)
+            if q:
+                questions.append(q)
+                
     # Deduplicate
     seen = set()
     unique_questions = []
-    for q in missing_questions:
+    for q in questions:
         if q not in seen:
             seen.add(q)
             unique_questions.append(q)
@@ -371,93 +315,6 @@ def _find_slots(
         tenant_id=tenant_id
     )
 
-
-# ═══════════════════════════════════════════════════════════════════════════
-#  Missing Fields Generator (Deterministic Intake)
-# ═══════════════════════════════════════════════════════════════════════════
-
-def generate_missing_fields(issue: ClinicalIssue) -> List[dict]:
-    """
-    Deterministically calculates which UI fields are required based on clinical features.
-    Returns a list of field definitions for the frontend dynamic renderer.
-    """
-    missing = []
-    
-    # Analyze raw text for context awareness (to avoid asking what's already said)
-    detail = (issue.symptom_cluster + " " + " ".join(issue.reported_symptoms)).lower()
-    
-    # ── Logic for Pain ────────────────────────────────────────────────────────
-    # If pain flag is set OR keywords are present
-    pain_keywords = ["pain", "hurt", "ache", "throb", "sore", "sensitive"]
-    has_pain_context = issue.has_pain or any(kw in detail for kw in pain_keywords)
-    
-    if has_pain_context:
-        # 1. Location
-        # Check struct or regex
-        has_location_text = bool(_LOCATION_REGEX.search(detail))
-        if not issue.location and not has_location_text:
-             missing.append({
-                "field_key": "location",
-                "label": "Location of pain",
-                "type": "text",
-                "required": True
-            })
-
-        # 2. Duration
-        # Check struct or regex
-        has_duration_text = bool(_DURATION_REGEX.search(detail))
-        if issue.duration_days is None and not has_duration_text:
-             missing.append({
-                "field_key": "duration",
-                "label": "Duration of pain",
-                "type": "select",
-                "required": True,
-                "options": [
-                    "Less than 24 hours",
-                    "1–3 days",
-                    "4–7 days",
-                    "More than 1 week"
-                ]
-            })
-
-        # 3. Severity
-        # Check struct or regex
-        has_severity_text = bool(_SEVERITY_REGEX.search(detail))
-        if issue.severity is None and not has_severity_text:
-             missing.append({
-                "field_key": "severity",
-                "label": "Pain severity",
-                "type": "slider",
-                "required": True,
-                "min": 1,
-                "max": 10
-            })
-
-    # ── Logic for Swelling ────────────────────────────────────────────────────
-    # If swelling flag is set OR keywords are present
-    swelling_keywords = ["swelling", "swollen", "swells", "puffed", "inflamed"]
-    has_swelling_context = issue.swelling or any(kw in detail for kw in swelling_keywords)
-    
-    if has_swelling_context and issue.urgency != "EMERGENCY":
-        # Check if airway/swallow mentioned
-        airway_keywords = ["breath", "swallow", "airway", "throat"]
-        has_airway_text = any(kw in detail for kw in airway_keywords)
-        
-        if not issue.airway_compromise and not has_airway_text:
-            missing.append({
-                "field_key": "airway_check",
-                "label": "Difficulty breathing or swallowing?",
-                "type": "boolean",
-                "required": True
-            })
-            
-    return missing
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-#  Orchestrate — Main Entry Point
-# ═══════════════════════════════════════════════════════════════════════════
-
 def orchestrate(
     db: Session,
     intent: IntentResult,
@@ -466,13 +323,15 @@ def orchestrate(
     """
     Hybrid 5-Layer Clinical Routing Pipeline.
     1. Semantic Extraction (Done in IntentResult)
-    2. Clinical Rules (_classify_condition)
-    3. Procedure Resolution (_resolve_procedure)
-    4. Constraint-Aware Scheduler (_find_slots)
-    5. Orchestration Combiner (This function)
+    2. Clinical Gate (New Layer: Assessment & Intake)
+    3. Clinical Rules (_classify_condition)
+    4. Procedure Resolution (_resolve_procedure)
+    5. Constraint-Aware Scheduler (_find_slots)
+    6. Orchestration Combiner (The Plan)
     """
 
     # ── Phase 0: Emergency Override (Layer 5 Priority) ────────────────────────
+    # Emergency bypasses Clinical Gate completeness checks
     if intent.safety_flag or intent.overall_urgency == "EMERGENCY" or intent.action_type == "ESCALATE":
         # Hard deterministic override
         emergency_proc = _resolve_procedure(db, "emergency", tenant_id)
@@ -487,14 +346,23 @@ def orchestrate(
             )
             emergency_slots = _find_slots(db, emergency_proc, dummy_issue, tenant_id)
             
+        # Generate Enterprise Artifacts for Emergency
+        dummy_issue = ClinicalIssue(
+             symptom_cluster="Emergency", 
+             suspected_category="Emergency",
+             urgency="EMERGENCY",
+             reasoning="Emergency Override"
+        )
         return OrchestrationPlan(
             is_emergency=True,
             overall_urgency="EMERGENCY",
             routed_issues=[],
             suggested_action="ESCALATE",
-            issues=intent.issues, # Pass Raw Issues
+            issues=intent.issues, 
             patient_sentiment=intent.patient_sentiment,
-            emergency_slots=emergency_slots
+            emergency_slots=emergency_slots,
+            routing_explanation=clinical_gate.get_safe_routing_language(dummy_issue),
+            fhir_bundle=clinical_gate.generate_fhir_bundle(dummy_issue)
         )
 
     # ── Phase 1: Non-Clinical Intents ─────────────────────────────────────────
@@ -507,61 +375,46 @@ def orchestrate(
             issues=intent.issues, # Pass Raw Issues
             patient_sentiment=intent.patient_sentiment
         )
-
-    # ── Phase 2: Clarification Check ──────────────────────────────────────────
-    # Only clarify if incomplete AND action is CLARIFY
-    # ── Phase 2: Clarification Check ──────────────────────────────────────────
-    # Only clarify if incomplete AND action is CLARIFY
-    if intent.action_type == "CLARIFY" and intent.completion_status != "COMPLETE":
-         # Calculate deterministic missing fields for UI
+            
+    # ── Phase 2: Clinical Gate (The "Doctor" Check) ──────────────────────────
+    # Check completeness BEFORE routing.
+    # Note: Even if LLM says "ROUTE", we assume "CLINICAL_EVALUATION" until proven complete.
+    
+    validation_questions = _validate_clinical_completeness(intent)
+    
+    if validation_questions:
+         # GATE CLOSED -> Return Clarification Plan
+         # We map "CLARIFY" action_type to the frontend
+         
+         # Construct structured clarification payload
          clarification_issues = []
          for issue in intent.issues:
-             # We create a clean dictionary for the clarification payload
-             # logic is: summary, missing_fields
-             missing = generate_missing_fields(issue)
-             if missing:
+             if issue.missing_clinical_elements:
                  clarification_issues.append({
-                     "issue_id": f"issue_{len(clarification_issues)+1}",
+                     "issue_id": f"issue_{intent.issues.index(issue)+1}",
                      "summary": issue.symptom_cluster,
-                     "missing_fields": missing
+                     "missing_fields": clinical_gate.generate_missing_fields(issue) if hasattr(clinical_gate, "generate_missing_fields") else [], # Backwards compat or new func
+                     "status": "Incomplete",
+                     "missing_elements": issue.missing_clinical_elements
                  })
-         
-         # Safety: If we are clarifying, we MUST have missing fields.
-         # If not, it means our logic considers it complete, so we should arguably route or force fallback.
-         # For now, if no missing fields but LLM said clarify, we might default to a generic "Describe more" 
-         # or just pass empty stats. But let's trust our generate_missing_fields logic.
-         
+
          return OrchestrationPlan(
             is_emergency=False,
             overall_urgency=intent.overall_urgency or "LOW",
             routed_issues=[],
             suggested_action="CLARIFY",
-            issues=intent.issues, # Keep raw issues for debug/context if needed
+            issues=intent.issues, # Pass updated issues with profiles
             patient_sentiment=intent.patient_sentiment,
-            clarification_questions=intent.clarification_questions, # Legacy fallback
-            # New Structured Payload
+            clarification_questions=validation_questions,
             clarification={
-                "issues": clarification_issues
+                "issues": clarification_issues,
+                "mode": "CLINICAL_INTAKE"
             }
         )
+
+    # ── Phase 3: CORE ROUTING LOOP (Gate Open) ───────────────────────────────
+    # Only reachable if validation_questions is None/Empty
     
-    # ── Phase 3: Validation Safety Net ────────────────────────────────────────
-    if intent.action_type != "ROUTE" and intent.completion_status != "COMPLETE":
-         validation_questions = _validate_clinical_completeness(intent)
-         if validation_questions:
-             # Merge and return
-             all_q = list(dict.fromkeys((intent.clarification_questions or []) + validation_questions))
-             return OrchestrationPlan(
-                is_emergency=False,
-                overall_urgency=intent.overall_urgency or "LOW",
-                routed_issues=[],
-                suggested_action="CLARIFY",
-                issues=intent.issues, # Pass Raw Issues
-                patient_sentiment=intent.patient_sentiment,
-                clarification_questions=all_q
-            )
-            
-    # ── Phase 4: CORE ROUTING LOOP (Layers 2-4) ───────────────────────────────
     routed_issues = []
     
     for idx, issue in enumerate(intent.issues):
@@ -581,37 +434,22 @@ def orchestrate(
              slots = _find_slots(db, proc, issue, tenant_id)
              
              # Construct TriageResult (Legacy compat, wrapper around proc)
-             # Ideally we'd remove TriageResult and just use RoutedIssue with Procedure data
-             # But for now we adapt it.
              triage_res = TriageResult(
                  procedure_id=proc.proc_id,
                  procedure_name=proc.name,
-                 specialist_type="Specialist", # TODO: Get from proc->specialization
+                 specialist_type="Specialist", 
                  consult_minutes=proc.consult_duration_minutes,
                  treatment_minutes=proc.base_duration_minutes,
                  requires_sedation=issue.requires_sedation or proc.requires_anesthetist,
                  room_capability=proc.required_room_capability,
                  requires_anesthetist=proc.requires_anesthetist,
                  allow_combo=proc.allow_same_day_combo,
-                 available_doctors=[] # Populated by slots
+                 available_doctors=[] 
              )
-             # We need to fetch specialist type name for UI
-             # Optimization: _resolve_procedure could do a join, or we do a quick lookup here
-             # For now, let's trust the slot finder populated doctors, OR do a quick lookup
-             # Let's do a quick lookup to be safe for the UI "specialist_type" field
-             # ... (Skipping for brevity, UI uses procedure_name mostly now)
-             # Actually, TriageResult.specialist_type IS used in UI (e.g. "Endodontist")
-             # Let's fetch it.
-             # But first let's handle the RoutedIssue construction.
         else:
-             # Fallback to General Checkup if procedure resolution failed (Safety Net)
-             # This should ideally never happen if DB is seeded correctly
              error = "Procedure resolution failed"
-             # Fallback logic could go here (e.g., triage_by_specialist) but 
-             # in strict mode we might want to default to General Checkup explicitly
              
         # ── Enterprise Presentation Layer ─────────────────────────────────────────
-        # Map internal procedure names to "Evaluation" labels (No Prescription)
         CLINICAL_DISPLAY_MAP = {
             "root_canal": "Endodontic Evaluation (Microscope)",
             "wisdom_extraction": "Oral Surgery Consultation (Wisdom)",
@@ -627,10 +465,10 @@ def orchestrate(
             issue_index=idx,
             symptom_cluster=issue.symptom_cluster,
             urgency=issue.urgency,
-            triage_result=triage_res, # Can be None if completely failed
-            reasoning_triggers=triggers, # ADDED: Evidence for routing
+            triage_result=triage_res,
+            reasoning_triggers=triggers,
             procedure_id=proc.proc_id if proc else None,
-            procedure_name=display_name, # CHANGED: Use Safe Display Name
+            procedure_name=display_name,
             duration_minutes=proc.base_duration_minutes if proc else 30,
             consult_minutes=proc.consult_duration_minutes if proc else 0,
             room_capability=proc.required_room_capability if proc else None,
@@ -643,7 +481,7 @@ def orchestrate(
         )
         routed_issues.append(ri)
 
-    # ── Phase 5: Combiner Logic ───────────────────────────────────────────────
+    # ── Phase 4: Combiner Logic ───────────────────────────────────────────────
     all_success = all(r.procedure_id is not None for r in routed_issues) and len(routed_issues) > 0
     
     can_combine = False
@@ -672,15 +510,26 @@ def orchestrate(
         if u > max_urg: max_urg = u
     final_urgency = rev_map[max_urg]
 
+    # Calculate Enterprise Artifacts (FHIR + Safe Language)
+    # We use the primary (highest urgency) issue for the main explanation/referral
+    primary_issue = intent.issues[0] if intent.issues else None
+    safe_lang = None
+    fhir = None
+    
+    if primary_issue:
+        safe_lang = clinical_gate.get_safe_routing_language(primary_issue)
+        fhir = clinical_gate.generate_fhir_bundle(primary_issue)
+
     return OrchestrationPlan(
         is_emergency=False,
         overall_urgency=final_urgency,
         routed_issues=routed_issues,
         suggested_action="ORCHESTRATE" if all_success else "CLARIFY",
-        issues=intent.issues, # Pass Raw Issues
+        issues=intent.issues, 
         combined_visit_possible=can_combine,
-        patient_sentiment=intent.patient_sentiment
+        patient_sentiment=intent.patient_sentiment,
+        routing_explanation=safe_lang,
+        fhir_bundle=fhir
     )
-
 
 
